@@ -1,6 +1,6 @@
 const route = require('express').Router()
 const { callOpenAi } = require('../config/openAi')
-const { getAllUserSessions, getSentiment, userEmotions } = require('../controllers/user-controllers')
+const { getAllUserSessions, getSentiment, userEmotions, parseScores, calculateMentalHealthScore, normalizeScores } = require('../controllers/user-controllers')
 const { getTexts, getTextFromSummaryTable, deleteAllTexts } = require('../controllers/text-controllers')
 const { registerSummary } = require('../controllers/summary-controller')
 const { upsertChunksWithEmbeddings } = require('../config/pinecone')
@@ -48,6 +48,9 @@ route.post("/endSession", async (req, res) => {
   const userDocument = await callOpenAi(userDocumentQuestion);
   const longSummary = await callOpenAi(longSummaryQuestion);
   const emotions = await userEmotions(queryEmotions);
+  const parsedScores = parseScores(dsmScore);
+  const normalizedScores = normalizeScores(parsedScores);
+  const mentalHealthScore = calculateMentalHealthScore(normalizedScores).toFixed(2);
 
   console.log(userMessages)
   console.log(emotions)
@@ -58,10 +61,10 @@ route.post("/endSession", async (req, res) => {
   const userMoodPercentage = moodTable[`${analyzeUser}`]
   const embeddings = await createEmbeddings(userDocument);
   await upsertChunksWithEmbeddings(userId, embeddings)
-  await registerSummary(userDocument, shortSummary, longSummary, userMoodPercentage, sessionId, userId, getData.chatlog)
+  await registerSummary(userDocument, shortSummary, longSummary, emotions, normalizedScores, mentalHealthScore, sessionId, userId, getData.chatlog)
   await deleteAllTexts(userId, sessionId)
 
   console.log({ chatlog: getData.chatlog, shortSummary: shortSummary, dsmScore: dsmScore, longSummary: longSummary, sessionId: sessionId, mood: userMoodPercentage })
-  res.send({ chatlog: getData.chatlog, shortSummary: shortSummary, longSummary: longSummary, sessionId: sessionId, mood: userMoodPercentage })
+  res.send({ chatlog: getData.chatlog, shortSummary: shortSummary, longSummary: longSummary, sessionId: sessionId, mood: userMoodPercentage, emotions: emotions, normalizedScores: normalizedScores, mentalHealthScore: mentalHealthScore })
 })
 module.exports = route;

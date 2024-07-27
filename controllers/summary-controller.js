@@ -1,12 +1,15 @@
 const { summaryRef, sessionTextsRef } = require('../config/connection')
 
-const registerSummary = async (shortMessage, longMessage, moodPercentage, sessionId, userId, chatLog) => {
+const registerSummary = async (userDocument, shortMessage, longMessage, emotions, normalizedScores, mentalHealthScore, sessionId, userId, chatLog) => {
   const timeStamp = new Date().toISOString();
   // Data to be added to the document
   const data = {
+    userDocument: userDocument,
     shortSummary: shortMessage,
     longSummary: longMessage,
-    moodPercentage: moodPercentage,
+    emotions: emotions,
+    normalizedScores: normalizedScores,
+    mentalHealthScore: mentalHealthScore,
     time: timeStamp,
     sessionId: sessionId,
     uid: userId,

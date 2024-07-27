@@ -9,6 +9,7 @@ const getDashboardData = async (userId) => {
         console.log('No matching documents.');
         return;
       }
+      
       let additionOfMentalScore = 0
       const resultArray = []
       querySnapshot.forEach((doc) => {

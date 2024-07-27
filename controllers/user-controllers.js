@@ -187,6 +187,72 @@ const getSentiment = async (uid, sessionId) => {
   }
 }
 
+const parseScores = (dsmScore) => {
+  const lines = dsmScore.split('\n');
+  const scores = {};
+
+  lines.forEach(line => {
+    const [key, value] = line.split(': ');
+    scores[key.trim()] = value === 'Not Applicable' ? 'Not Applicable' : parseInt(value.trim(), 10);
+  });
+
+  return scores;
+};
+
+// Function to normalize scores
+const normalizeScores = (scores) => {
+  const ranges = {
+    'PHQ-9 Score': [0, 27],
+    'GAD-7 Score': [0, 21],
+    'CBT Behavioral Activation': [0, 7],
+    'Rosenberg Self Esteem': [10, 40],
+    'PSQI Score': [0, 21],
+    'SFQ Score': [0, 32],
+    'PSS Score': [0, 40],
+    'SSRS Assessment': [0, 5],
+  };
+
+  const normalizedScores = {};
+  for (const key in scores) {
+    if (scores[key] === 'Not Applicable') {
+      normalizedScores[key] = 'Not Applicable';
+    } else {
+      const [min, max] = ranges[key];
+      normalizedScores[key] = ((scores[key] - min) / (max - min)) * 10;
+    }
+  }
+
+  return normalizedScores;
+};
+
+
+const calculateMentalHealthScore = (scores) => {
+  const weights = {
+    'PHQ-9 Score': 3,
+    'GAD-7 Score': 3,
+    'CBT Behavioral Activation': 2,
+    'Rosenberg Self Esteem': 1,
+    'PSQI Score': 2,
+    'SFQ Score': 2,
+    'PSS Score': 1,
+    'SSRS Assessment': 1,
+  };
+
+  let totalWeightedScore = 0;
+  let totalWeight = 0;
+
+  for (const key in scores) {
+    if (scores[key] !== 'Not Applicable' && !isNaN(scores[key])) {
+      totalWeightedScore += scores[key] * weights[key];
+      totalWeight += weights[key];
+    }
+  }
+  return 10 - (totalWeightedScore / totalWeight);
+};
+
+
+
+
 
 module.exports = {
   emailAllUserTranscripts,
@@ -195,5 +261,8 @@ module.exports = {
   updateFieldInUserCollection,
   checkForExistingData,
   getSentiment,
-  userEmotions
+  userEmotions,
+  parseScores,
+  calculateMentalHealthScore,
+  normalizeScores
 }

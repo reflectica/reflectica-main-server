@@ -23,8 +23,8 @@ route.post("/", async (req, res) => {
   });
 
   // Append the current prompt to the conversation history
-  const combinedPrompt = conversationHistory + `Additional Information: ${matchingTextsString}\n` + `User: ${prompt}\nAI:`;
-
+  const combinedPrompt = conversationHistory + `Additional Information about the user, use this information to guide your responses: ${matchingTextsString}\n` + `User: ${prompt}\nAI:`;
+  console.log("blah", combinedPrompt)
 
   let textResponse;
   console.log(getData)
