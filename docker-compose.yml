@@ -1,0 +1,16 @@
+version: '3.9'
+
+services:
+  server:
+    build:
+      context: .
+    ports:
+      - "3006:3006" # Map server port to 3006
+    volumes:
+      - .:/server
+      - /server/node_modules
+    environment:
+      # Add your environment variables here
+      - NODE_ENV=development
+      # Specify the server port as an environment variable if needed
+      - PORT=3006
