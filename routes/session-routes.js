@@ -55,7 +55,7 @@ route.post("/endSession", async (req, res) => {
   console.log(userMessages)
   console.log(emotions)
   console.log(userDocument, "user doc")
-  console.log(shortSummary, "dsagadsgadgads")
+  console.log(dsmScore)
   console.log(longSummary, "asdgandgoasdgoagadsg")
 
   const userMoodPercentage = moodTable[`${analyzeUser}`]

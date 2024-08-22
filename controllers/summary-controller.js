@@ -1,8 +1,8 @@
-const { summaryRef, sessionTextsRef } = require('../config/connection')
+const { admin, summaryRef, db } = require('../config/connection'); // Import the admin and db instances
 
 const registerSummary = async (userDocument, shortMessage, longMessage, emotions, normalizedScores, mentalHealthScore, sessionId, userId, chatLog) => {
-  const timeStamp = new Date().toISOString();
-  // Data to be added to the document
+  const timeStamp = admin.firestore.Timestamp.now(); // Use Firestore Timestamp
+
   const data = {
     userDocument: userDocument,
     shortSummary: shortMessage,
@@ -18,12 +18,12 @@ const registerSummary = async (userDocument, shortMessage, longMessage, emotions
 
   // Add data to the collection
   summaryRef.add(data)
-  .then((docRef) => {
-    console.log('Document written with ID: ', docRef.id);
-  })
-  .catch((error) => {
-    console.error('Error adding document: ', error);
-  });
+    .then((docRef) => {
+      console.log('Document written with ID: ', docRef.id);
+    })
+    .catch((error) => {
+      console.error('Error adding document: ', error);
+    });
 }
 
-module.exports = { registerSummary }
+module.exports = { registerSummary };
