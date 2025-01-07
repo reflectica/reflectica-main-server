@@ -21,9 +21,8 @@ route.post("/getSessionTranscripts", async (req, res) => {
 })
 
 route.post("/endSession", async (req, res) => {
-  const { userId, sessionId, language } = req.body; // Include 'language' from the request body
+  const { userId, sessionId, language, sessionType } = req.body; // Include 'language' from the request body
   const getData = await getTexts(userId, sessionId);
-  console.log(getData, "hhh");
 
   const userMessages = getData.chatlog
     .filter(entry => entry.role === 'user')
@@ -34,6 +33,7 @@ route.post("/endSession", async (req, res) => {
   const englishTranscript = await callOpenAi(spanishTranscipt);
   const queryData = { "inputs": userMessages };
   const queryEmotions = { "text": userMessages };
+  console.log("queryemotions", queryEmotions)
   const querySpanish = {"text": englishTranscript}
 
   const shortSummaryQuestion = getData.chatlog.concat(askForShortSummary);
@@ -60,12 +60,10 @@ route.post("/endSession", async (req, res) => {
 
   // Conditionally handle emotions based on language
   let emotions;
-  console.log('spanish', querySpanish);
-  console.log('english', queryEmotions);
   if (language === 'es-ES') {
-    emotions = await userEmotions(querySpanish);
+    emotions = await userEmotions(JSON.stringify(querySpanish));
   } else {
-    emotions = await userEmotions(queryEmotions);
+    emotions = await userEmotions(JSON.stringify(queryEmotions));
   }
 
   const parsedScores = parseScores(dsmScore);
@@ -95,8 +93,15 @@ route.post("/endSession", async (req, res) => {
     }
   ];
 
+
   // Call OpenAI with the combined prompt to get the referral recommendation
-  const referralRecommendation = await callOpenAi(referralPrompt);
+  let referralRecommendation;
+  if (sessionType === 'diagnostic'){
+    referralRecommendation = await callOpenAi(referralPrompt);
+  } else {
+    referralRecommendation = ''
+  }
+  
 
   // Log results for debugging
   console.log("Referral Recommendation:", referralRecommendation);
@@ -104,7 +109,7 @@ route.post("/endSession", async (req, res) => {
   const userMoodPercentage = moodTable[`${analyzeUser}`];
   const embeddings = await createEmbeddings(userDocument);
   await upsertChunksWithEmbeddings(userId, embeddings);
-  await registerSummary(userDocument, shortSummary, longSummary, emotions, normalizedScores, mentalHealthScore, sessionId, userId, getData.chatlog);
+  await registerSummary(userDocument, shortSummary, longSummary, emotions, normalizedScores, mentalHealthScore, referralRecommendation, sessionId, userId, getData.chatlog);
   await deleteAllTexts(userId, sessionId);
 
   console.log({

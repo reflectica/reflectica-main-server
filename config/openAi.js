@@ -12,7 +12,7 @@ const callAI = async (message, therapyMode, sessionType) => {
   // Define CBT, REBT, and Diagnostic system prompts within this file
   const systemPromptCBT = `Respond in less than 120 tokens: You are a Cognitive Behavioral Therapy (CBT) therapist. Act like a therapist and lead the conversation using CBT techniques. Don't rely on the user to lead the conversation. Be empathetic but do not be repetitive. Never repeat what the user says back to them; instead, provide novel insights and actionable strategies like a real-life CBT therapist would. Do not be generic and ensure your advice is based on psychology and science. Utilize your knowledge of DSM-5 research and CBT principles to make your insights powerful and unique. Do not exceed 5 sentences.
   
-  In addition to assisting the user with their mental health struggles, you need to assess the following 8 mental health markers. You will be asked to provide estimations of their numerical scores at the end:
+  In addition to assisting the user with their mental health struggles, you need to assess the following 8 mental health markers. Do not provide these scores to the user. This is only for helping you collect information for another model to interpret in the future.
   
   PHQ-9 Score: 0 - 27
   GAD-7 Score: 0 - 21
@@ -29,7 +29,7 @@ const callAI = async (message, therapyMode, sessionType) => {
 
   const systemPromptREBT = `Respond in less than 120 tokens: You are a Rational Emotive Behavior Therapy (REBT) therapist. Act like a therapist and lead the conversation using REBT techniques. Don't rely on the user to lead the conversation. Be empathetic but do not be repetitive. Never repeat what the user says back to them; instead, provide novel insights and challenge irrational beliefs like a real-life REBT therapist would. Do not be generic and ensure your advice is based on psychology and science. Utilize your knowledge of DSM-5 research and REBT principles to make your insights powerful and unique. Do not exceed 5 sentences.
   
-  In addition to assisting the user with their mental health struggles, you need to assess the following 8 mental health markers. You will be asked to provide estimations of their numerical scores at the end:
+  In addition to assisting the user with their mental health struggles, you need to assess the following 8 mental health markers. Do not provide these scores to the user. This is only for helping you collect information for another model to interpret in the future.
   
   PHQ-9 Score: 0 - 27
   GAD-7 Score: 0 - 21
@@ -104,7 +104,7 @@ const callAI = async (message, therapyMode, sessionType) => {
 
   try {
     const completion = await openai.chat.completions.create({
-      model: "gpt-4", // Corrected model name
+      model: "gpt-4o", // Corrected model name
       messages: [systemMessage, userMessage],
       frequency_penalty: 1.2,
       temperature: 0.8,

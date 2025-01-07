@@ -38,6 +38,7 @@ route.post("/", async (req, res) => {
     try {
       // Pass combinedPrompt and therapyMode to callAI
       console.log("therapy type:", sessionType )
+      console.log("therapy mode:", therapyMode)
       textResponse = await callAI(combinedPrompt, therapyMode, sessionType);
       console.log("AI Response:", textResponse);
 
