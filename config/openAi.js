@@ -2,15 +2,18 @@
 
 const { OpenAI } = require("openai");
 const axios = require('axios');
+const { writeFileSync } = require('fs');
+const path = require('path');
+const fs = require('fs');
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: 'sk-proj-ZUk8FLdodqKhC9apJ1PIT3BlbkFJQDwZH8Stpb5zPZ5hE1oe',
 });
 
 // Modify callAI to accept therapyMode
 const callAI = async (message, therapyMode, sessionType) => {
   // Define CBT, REBT, and Diagnostic system prompts within this file
-  const systemPromptCBT = `Respond in less than 120 tokens: You are a Cognitive Behavioral Therapy (CBT) therapist. Act like a therapist and lead the conversation using CBT techniques. Don't rely on the user to lead the conversation. Be empathetic but do not be repetitive. Never repeat what the user says back to them; instead, provide novel insights and actionable strategies like a real-life CBT therapist would. Do not be generic and ensure your advice is based on psychology and science. Utilize your knowledge of DSM-5 research and CBT principles to make your insights powerful and unique. Do not exceed 5 sentences.
+  const systemPromptCBT = `You are a Cognitive Behavioral Therapy (CBT) therapist. Act like a therapist and lead the conversation using CBT techniques. Don't rely on the user to lead the conversation. Be empathetic but do not be repetitive. Never repeat what the user says back to them; instead, provide novel insights and actionable strategies like a real-life CBT therapist would. Do not be generic and ensure your advice is based on psychology and science. Utilize your knowledge of DSM-5 research and CBT principles to make your insights powerful and unique. Do not exceed 5 sentences.
   
   In addition to assisting the user with their mental health struggles, you need to assess the following 8 mental health markers. Do not provide these scores to the user. This is only for helping you collect information for another model to interpret in the future.
   
@@ -27,7 +30,7 @@ const callAI = async (message, therapyMode, sessionType) => {
   
   Your primary role is to act as a therapist, and your secondary role is to assess these scores based on the conversation. Maintain a natural conversational flow to ensure the user feels supported and understood.`;
 
-  const systemPromptREBT = `Respond in less than 120 tokens: You are a Rational Emotive Behavior Therapy (REBT) therapist. Act like a therapist and lead the conversation using REBT techniques. Don't rely on the user to lead the conversation. Be empathetic but do not be repetitive. Never repeat what the user says back to them; instead, provide novel insights and challenge irrational beliefs like a real-life REBT therapist would. Do not be generic and ensure your advice is based on psychology and science. Utilize your knowledge of DSM-5 research and REBT principles to make your insights powerful and unique. Do not exceed 5 sentences.
+  const systemPromptREBT = `You are a Rational Emotive Behavior Therapy (REBT) therapist. Act like a therapist and lead the conversation using REBT techniques. Don't rely on the user to lead the conversation. Be empathetic but do not be repetitive. Never repeat what the user says back to them; instead, provide novel insights and challenge irrational beliefs like a real-life REBT therapist would. Do not be generic and ensure your advice is based on psychology and science. Utilize your knowledge of DSM-5 research and REBT principles to make your insights powerful and unique. Do not exceed 5 sentences.
   
   In addition to assisting the user with their mental health struggles, you need to assess the following 8 mental health markers. Do not provide these scores to the user. This is only for helping you collect information for another model to interpret in the future.
   
@@ -103,14 +106,33 @@ const callAI = async (message, therapyMode, sessionType) => {
   };
 
   try {
+    const startTime = Date.now(); // Capture the start time
+
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o", // Corrected model name
+      model: "gpt-4o-audio-preview", // Corrected model name,
+      modalities: ["text", "audio"],
+      audio: { voice: "nova", format: "wav" },
       messages: [systemMessage, userMessage],
       frequency_penalty: 1.2,
       temperature: 0.8,
+      max_tokens: 2000
     });
 
-    return completion.choices[0].message.content;
+    const endTime = Date.now(); // Capture the end time
+    const duration = endTime - startTime; // Calculate the duration
+    console.log(`Response time: ${duration} ms`);
+
+    const base64AudioData = completion.choices[0].message.audio.data;
+    // Save audio to file for testing
+    const audioFilePath = path.join(__dirname, '../test-audio.wav');
+    fs.writeFileSync(audioFilePath, Buffer.from(base64AudioData, 'base64'));
+    console.log(`Audio saved to ${audioFilePath} for testing`);
+
+    return {
+      text: completion.choices[0].message.audio.transcript,
+      audioFile: base64AudioData
+    };
+
   } catch (error) {
     console.error('Error in callAI:', error);
     throw error;

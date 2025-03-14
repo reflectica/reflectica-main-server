@@ -39,22 +39,15 @@ route.post("/", async (req, res) => {
       // Pass combinedPrompt and therapyMode to callAI
       console.log("therapy type:", sessionType )
       console.log("therapy mode:", therapyMode)
-      textResponse = await callAI(combinedPrompt, therapyMode, sessionType);
+      const aiResponse = await callAI(combinedPrompt, therapyMode, sessionType);
+      const textResponse = aiResponse.text;
+      const audioFilePath = aiResponse.audioFile;    
       console.log("AI Response:", textResponse);
 
       // Log AI's response
       await addTextData(userId, "assistant", textResponse, sessionId);
 
-      // OpenAI TTS API call
-      const response = await openai.audio.speech.create({
-        model: "tts-1",
-        voice: "nova",
-        input: textResponse
-      });
-
-      const audioStream = Buffer.from(await response.arrayBuffer());
-      const audioStreamBase64 = audioStream.toString('base64');
-      res.send({ audio: audioStreamBase64 });
+      res.send({ audio: audioFilePath });
 
     } catch (e) {
       console.log(e);
@@ -67,7 +60,6 @@ route.post("/", async (req, res) => {
     console.log(e);
     res.status(500).send(e);
   }
-
 });
 
 module.exports = route;
