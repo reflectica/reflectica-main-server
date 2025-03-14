@@ -7,7 +7,7 @@ const path = require('path');
 const fs = require('fs');
 
 const openai = new OpenAI({
-  apiKey: 'sk-proj-ZUk8FLdodqKhC9apJ1PIT3BlbkFJQDwZH8Stpb5zPZ5hE1oe',
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
 // Modify callAI to accept therapyMode
