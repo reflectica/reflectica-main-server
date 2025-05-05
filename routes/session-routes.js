@@ -101,7 +101,6 @@ route.post("/endSession", async (req, res) => {
   } else {
     referralRecommendation = ''
   }
-  
 
   // Log results for debugging
   console.log("Referral Recommendation:", referralRecommendation);
@@ -135,6 +134,5 @@ route.post("/endSession", async (req, res) => {
     referral: referralRecommendation, // Include referral recommendation in the response
   });
 });
-
 
 module.exports = route;

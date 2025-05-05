@@ -1,92 +1,102 @@
 const { Pinecone } = require('@pinecone-database/pinecone');
 const { OpenAI } = require("openai");
 
+// Create clients outside request handlers to reuse connections
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-
 const pineconeClient = new Pinecone({
-    apiKey: process.env.PINECONE_API_KEY,
-    environment: process.env.PINECONE_ENVIRONMENT,
-  });
+  apiKey: process.env.PINECONE_API_KEY,
+  environment: process.env.PINECONE_ENVIRONMENT,
+});
+
+// Create a simple in-memory cache
+const queryCache = new Map();
+const CACHE_TTL = 1000 * 60 * 30; // 30 minutes
 
 const upsertChunksWithEmbeddings = async (userID, chunksWithEmbeddings) => {
-    const indexName = 'user1-summary'; 
-
+  const indexName = 'user1-summary';
+  const index = pineconeClient.index(indexName);
   
-    // Connect to the default index
-    const index = pineconeClient.index(indexName);
-    
-    // Process everything in batches of 64
-    const vectorLength = 1536; // The length of each embedding vector
-    const batch_size = 1536;
-    
-    const upsertData = [];
-    for (let i = 0; i < chunksWithEmbeddings.length; i += batch_size) {
-      // Extract a batch of chunks with embeddings
-      const data_batch = chunksWithEmbeddings.slice(i, i + batch_size);
-    
-      // Map over each chunk in the batch to create upsert objects
-      for (const [batchIndex, chunk] of data_batch.entries()) {
-        // Ensure each embedding is an array of the correct length
-        if (!Array.isArray(chunk.embedding) || chunk.embedding.length !== vectorLength) {
-          throw new Error(`Embedding at index ${batchIndex} does not have ${vectorLength} dimensions`);
-        }
-    
-        upsertData.push({
-          id: `${userID}-${i + batchIndex}`,
-          values: chunk.embedding, // Use the embedding array
-          metadata: {
-            userID: userID, // Add userID in the metadata for each vector
-            text: chunk.text // Include the text chunk as part of the metadata
-          },
-        });
-      }
-      console.log("Upserting vector:", upsertData);
-      await index.upsert(upsertData); // Pass the array directly to upsert
-      console.log("successfully upsert")
-    }
-  };
-    
-    
-  const searchDocs = async (userID, query) => {
-    const indexName = "user1-summary"; // Ensure this is the correct index name
-    const pineconeClient = new Pinecone({
-      apiKey: process.env.PINECONE_API_KEY,
-      environment: process.env.PINECONE_ENVIRONMENT,
-    });
-    const index = pineconeClient.index(indexName);
+  // Optimize batch size - test different values (32, 64, 100)
+  const batch_size = 64;
   
-    // Create the embedding for the query
-    const embeddingResponse = await openai.embeddings.create({
-      model: "text-embedding-ada-002",
-      input: query,
-      encoding_format: "float",
-    });
-    const queryEmbedding = embeddingResponse.data[0].embedding
-    console.log(queryEmbedding)
-    // Query the Pinecone index with the embedding
-    const res = await index.query({
-      vector: queryEmbedding,
-      topK: 5,
-      includeMetadata: true,
-      filter: {
-        userID: userID // Filter by userID in metadata
-      }
-    });
-  
-    // Define a similarity threshold
-    const similarityThreshold = 0.8; // Adjust this value as needed
-  
-    // Parse the matches to extract metadata text, filtering by similarity
-    const matchingTexts = res.matches
-      .filter(match => match.metadata.userID === userID && match.score >= similarityThreshold)
-      .map(match => match.metadata.text); // Extract only the text from metadata
-    return matchingTexts;
-  };
-
-  module.exports = {
-    upsertChunksWithEmbeddings,
-    searchDocs,
+  // Process in parallel batches for faster insertion
+  const batches = [];
+  for (let i = 0; i < chunksWithEmbeddings.length; i += batch_size) {
+    const batch = chunksWithEmbeddings.slice(i, i + batch_size);
+    batches.push(index.upsert(batch));
   }
+  
+  await Promise.all(batches);
+  console.log(`Upserted ${chunksWithEmbeddings.length} vectors in parallel batches`);
+};
+
+// Optimized search function
+const searchDocs = async (query, userId, limit = 5) => {
+  // Generate cache key
+  const cacheKey = `${userId}-${query}-${limit}`;
+  
+  // Check cache first
+  if (queryCache.has(cacheKey)) {
+    const { data, timestamp } = queryCache.get(cacheKey);
+    if (Date.now() - timestamp < CACHE_TTL) {
+      console.log("Cache hit! Returning cached results");
+      return data;
+    }
+    // Cache expired, remove it
+    queryCache.delete(cacheKey);
+  }
+  
+  const indexName = 'user1-summary';
+  const index = pineconeClient.index(indexName);
+  
+  // Get embeddings for the query
+  const start = Date.now();
+  const embedding = await getQueryEmbedding(query);
+  console.log(`Embedding generation time: ${Date.now() - start}ms`);
+  
+  // Use metadata filtering to narrow search scope
+  const searchStart = Date.now();
+  const results = await index.query({
+    vector: embedding,
+    topK: limit,
+    includeMetadata: true,
+    includeValues: false, // Don't include vector values to reduce payload size
+    filter: { userId: userId }, // Add metadata filter if applicable
+  });
+  console.log(`Pinecone query time: ${Date.now() - searchStart}ms`);
+  
+  // Store in cache
+  queryCache.set(cacheKey, { 
+    data: results, 
+    timestamp: Date.now() 
+  });
+  
+  return results;
+};
+
+// Helper function to get query embedding
+const getQueryEmbedding = async (text) => {
+  const response = await openai.embeddings.create({
+    model: "text-embedding-3-small", // Using smaller model for faster performance
+    input: text
+  });
+  return response.data[0].embedding;
+};
+
+// Clear old cache entries periodically
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, { timestamp }] of queryCache.entries()) {
+    if (now - timestamp > CACHE_TTL) {
+      queryCache.delete(key);
+    }
+  }
+}, 1000 * 60 * 10); // Clean every 10 minutes
+
+module.exports = {
+  upsertChunksWithEmbeddings,
+  searchDocs
+};
