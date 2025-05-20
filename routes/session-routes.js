@@ -29,6 +29,7 @@ route.post("/endSession", async (req, res) => {
     .map(entry => entry.content)
     .join(' ');
 
+  let cleanedText = userMessages.replace(/\n/g, ' ');
   const spanishTranscipt = getData.chatlog.concat(englishToSpanish);
   const englishTranscript = await callOpenAi(spanishTranscipt);
   const queryData = { "inputs": userMessages };
@@ -63,7 +64,8 @@ route.post("/endSession", async (req, res) => {
   if (language === 'es-ES') {
     emotions = await userEmotions(JSON.stringify(querySpanish));
   } else {
-    emotions = await userEmotions(JSON.stringify(queryEmotions));
+    emotions = await userEmotions(JSON.stringify({ text: cleanedText }));
+    
   }
 
   const parsedScores = parseScores(dsmScore);
@@ -106,8 +108,8 @@ route.post("/endSession", async (req, res) => {
   console.log("Referral Recommendation:", referralRecommendation);
 
   const userMoodPercentage = moodTable[`${analyzeUser}`];
-  const embeddings = await createEmbeddings(userDocument);
-  await upsertChunksWithEmbeddings(userId, embeddings);
+  //const embeddings = await createEmbeddings(userDocument);
+  //await upsertChunksWithEmbeddings(userId, embeddings);
   await registerSummary(userDocument, shortSummary, longSummary, emotions, normalizedScores, mentalHealthScore, referralRecommendation, sessionId, userId, getData.chatlog);
   await deleteAllTexts(userId, sessionId);
 
