@@ -1,6 +1,6 @@
 const { admin, summaryRef, db } = require('../config/connection'); // Import the admin and db instances
 
-const registerSummary = async (userDocument, shortMessage, longMessage, emotions, normalizedScores, mentalHealthScore, referralRecommendation, sessionId, userId, chatLog) => {
+const registerSummary = async (userDocument, shortMessage, longMessage, emotions, rawScores, normalizedScores, mentalHealthScore, referralRecommendation, sessionId, userId, chatLog) => {
   const timeStamp = admin.firestore.Timestamp.now(); // Use Firestore Timestamp
 
   const data = {
@@ -8,6 +8,7 @@ const registerSummary = async (userDocument, shortMessage, longMessage, emotions
     shortSummary: shortMessage,
     longSummary: longMessage,
     emotions: emotions,
+    rawScores: rawScores,
     normalizedScores: normalizedScores,
     mentalHealthScore: mentalHealthScore,
     referralRecommendation: referralRecommendation,

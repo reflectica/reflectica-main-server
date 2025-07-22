@@ -29,6 +29,10 @@ route.post("/endSession", async (req, res) => {
     .map(entry => entry.content)
     .join(' ');
 
+  const fullSessionTranscript = getData.chatlog
+    .map(entry => `[${entry.role}] ${entry.content}`)
+    .join('\n');
+
   let cleanedText = userMessages.replace(/\n/g, ' ');
   const spanishTranscipt = getData.chatlog.concat(englishToSpanish);
   const englishTranscript = await callOpenAi(spanishTranscipt);
@@ -68,15 +72,15 @@ route.post("/endSession", async (req, res) => {
     
   }
 
-  const parsedScores = parseScores(dsmScore);
-  const normalizedScores = normalizeScores(parsedScores);
+  const rawScores = parseScores(dsmScore);
+  const normalizedScores = normalizeScores(rawScores);
   const mentalHealthScore = calculateMentalHealthScore(normalizedScores).toFixed(2);
 
   // Create the referral prompt by combining DSM scores and user messages
-  const referralPrompt = [
+const referralPrompt = [
     {
       role: "system",
-      content: `You are a mental health referral bot. Analyze the following DSM scores and patient transcript to recommend a specialized therapy. Choose from the following areas: 
+      content: `You are a mental health referral bot. Analyze the following DSM scores and patient transcript to recommend a specialized therapy. Choose from the following areas:
       
       1. Depression/Anxiety
       2. Trauma and PTSD
@@ -84,25 +88,36 @@ route.post("/endSession", async (req, res) => {
       4. Substance Abuse/Addiction
       5. Grief and Loss
 
-      DSM Scores: ${JSON.stringify(parsedScores)}
+      DSM Scores: ${JSON.stringify(rawScores)}
 
       Transcript: ${userMessages}
 
-      Respond in this format:
+      At the end of your response, include the entire session transcript.
 
+      Respond in this format:
+      
       Recommended Specialization: [Specialization]
-      Reason: [Explanation based on DSM scores and transcript]`
+      Reason: [Explanation based on DSM scores and transcript]
+      Summary for Clinicians: [Concise summary of the patient's current situation]
+      Severity Assessment (1-5): [Number indicating current severity level, 5 = most critical]
+      Priority Ranking (1-5): [Number indicating how urgently care is needed, 5 = most urgent]
+
+      Full Session Transcript: [The entire session transcript here, exactly as provided below.]
+
+      =====
+
+      Full Session Transcript to Include:
+      ${fullSessionTranscript}
+      `
     }
   ];
 
 
+
   // Call OpenAI with the combined prompt to get the referral recommendation
-  let referralRecommendation;
-  if (sessionType === 'diagnostic'){
-    referralRecommendation = await callOpenAi(referralPrompt);
-  } else {
-    referralRecommendation = ''
-  }
+
+  referralRecommendation = await callOpenAi(referralPrompt);
+
 
   // Log results for debugging
   console.log("Referral Recommendation:", referralRecommendation);
@@ -110,7 +125,7 @@ route.post("/endSession", async (req, res) => {
   const userMoodPercentage = moodTable[`${analyzeUser}`];
   //const embeddings = await createEmbeddings(userDocument);
   //await upsertChunksWithEmbeddings(userId, embeddings);
-  await registerSummary(userDocument, shortSummary, longSummary, emotions, normalizedScores, mentalHealthScore, referralRecommendation, sessionId, userId, getData.chatlog);
+  await registerSummary(userDocument, shortSummary, longSummary, emotions, normalizedScores, rawScores, mentalHealthScore, referralRecommendation, sessionId, userId, getData.chatlog);
   await deleteAllTexts(userId, sessionId);
 
   console.log({
@@ -131,6 +146,7 @@ route.post("/endSession", async (req, res) => {
     sessionId: sessionId,
     mood: userMoodPercentage,
     emotions: emotions,
+    rawScores: rawScores,
     normalizedScores: normalizedScores,
     mentalHealthScore: mentalHealthScore,
     referral: referralRecommendation, // Include referral recommendation in the response

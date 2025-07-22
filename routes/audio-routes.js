@@ -19,6 +19,39 @@ route.get("/", async (req, res) => {
   // Send back the JSON we received from the OpenAI REST API
   res.send(data);
 });
+// In your backend audio routes
+route.post('/openai-proxy', async (req, res) => {
+  try {
+    const { sdp, model, ephemeralKey } = req.body;
+    
+    console.log('🔄 Proxying SDP request to OpenAI Realtime API...');
+    console.log('Model:', model);
+    console.log('SDP length:', sdp?.length);
+    
+    const response = await fetch(`https://api.openai.com/v1/realtime?model=${model}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${ephemeralKey}`,
+        'Content-Type': 'application/sdp',
+      },
+      body: sdp,
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ OpenAI API error:', response.status, errorText);
+      throw new Error(`OpenAI API returned ${response.status}: ${errorText}`);
+    }
+    
+    const data = await response.text();
+    console.log('✅ OpenAI proxy successful, response length:', data.length);
+    
+    res.status(200).send(data);
+  } catch (error) {
+    console.error('❌ OpenAI proxy error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
 
 route.post("/transcript", async (req, res) => {
   const { userId, sessionId, role, message } = req.body;
