@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "jest",
     "start": "nodemon index.js"
   },
   "keywords": [],
@@ -27,6 +27,7 @@
     "path": "^0.12.7",
     "play-sound": "^1.1.6",
     "sentiment": "^5.0.2",
-    "supertest": "^7.0.0"
+    "supertest": "^7.0.0",
+    "uuid": "^11.1.0"
   }
 }
