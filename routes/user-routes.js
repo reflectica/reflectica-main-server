@@ -1,13 +1,14 @@
 const route = require('express').Router()
 const { updateFieldInUserCollection, emailAllUserTranscripts, deleteAllUserSummaries } = require('../controllers/user-controllers')
+const { authenticateToken, authorizeUser } = require('../middleware/auth')
 
-route.post("/updateUserField", async (req, res) => {
+route.post("/updateUserField", authenticateToken, authorizeUser, async (req, res) => {
     const { value, fieldName, userId } = req.body;
     await updateFieldInUserCollection(userId, value, fieldName)
     res.send()
 })
 
-route.post("/deleteEverythingForUser", async (req, res) => {
+route.post("/deleteEverythingForUser", authenticateToken, authorizeUser, async (req, res) => {
     const { userId } = req.body;
     await emailAllUserTranscripts(userId)
     await deleteAllUserSummaries(userId)
