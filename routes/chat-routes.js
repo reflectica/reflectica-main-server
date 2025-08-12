@@ -4,8 +4,9 @@ const route = require('express').Router();
 const { callAI, openai } = require('../config/openAi');
 const { addTextData, getTexts, getTextsSeperated } = require('../controllers/text-controllers');
 const { searchDocs } = require('../config/pinecone');
+const { authAndPHIWrite } = require('../middleware');
 
-route.post("/", async (req, res) => {
+route.post("/", authAndPHIWrite({ resource: 'chat_session' }), async (req, res) => {
   const { prompt, userId, sessionId, therapyMode, sessionType } = req.body; // Extract therapyMode
 
   if (!therapyMode) {

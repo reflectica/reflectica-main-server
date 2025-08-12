@@ -1,6 +1,7 @@
 const route = require('express').Router();
 const path = require('path');
 const { addTextData } = require('../controllers/text-controllers');
+const { authAndPHIWrite } = require('../middleware');
 
 route.get("/", async (req, res) => {
   const r = await fetch("https://api.openai.com/v1/realtime/sessions", {
@@ -53,7 +54,7 @@ route.post('/openai-proxy', async (req, res) => {
   }
 });
 
-route.post("/transcript", async (req, res) => {
+route.post("/transcript", authAndPHIWrite({ resource: 'audio_transcript' }), async (req, res) => {
   const { userId, sessionId, role, message } = req.body;
 
   try {
