@@ -7,20 +7,21 @@ const { upsertChunksWithEmbeddings } = require('../config/pinecone')
 const { createEmbeddings } = require('../config/openAi')
 const { askForShortSummary, askForin5LongSummary, askForin3LongSummary, askForUserProfile, askForDSMScores, askForDSMScoresSpanish, englishToSpanish } = require('../utils/text')
 const { moodTable } = require('../utils/mood')
+const { authAndPHIRead, authAndPHIWrite } = require('../middleware')
 
-route.post("/getAllSessions", async (req, res) => {
+route.post("/getAllSessions", authAndPHIRead({ resource: 'user_sessions' }), async (req, res) => {
   const { userId } = req.body;
   const getAllSessionsForUser = await getAllUserSessions(userId);
   res.send({ sessions: getAllSessionsForUser })
 })
 
-route.post("/getSessionTranscripts", async (req, res) => {
+route.post("/getSessionTranscripts", authAndPHIRead({ resource: 'session_transcripts' }), async (req, res) => {
   const { sessionId, userId } = req.body;
   const getAllTranscriptsForSessions = await getTextFromSummaryTable(userId, sessionId)
   res.send(getAllTranscriptsForSessions)
 })
 
-route.post("/endSession", async (req, res) => {
+route.post("/endSession", authAndPHIWrite({ resource: 'session_summary' }), async (req, res) => {
   const { userId, sessionId, language, sessionType } = req.body; // Include 'language' from the request body
   const getData = await getTexts(userId, sessionId);
 
