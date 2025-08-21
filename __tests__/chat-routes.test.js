@@ -30,13 +30,22 @@ describe('POST /chat', () => {
     expect(res.body.error).toBe('Missing therapyMode parameter.');
   });
 
+  it('should return 400 if required parameters are missing', async () => {
+    const res = await request(app)
+      .post('/chat')
+      .send({ therapyMode: 'mode1' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Missing required parameters');
+  });
+
   it('should return 200 and audio response if all parameters are provided', async () => {
     addTextData.mockResolvedValue();
     getTexts.mockResolvedValue([]);
     getTextsSeperated.mockResolvedValue({ userLogs: [], aiLogs: [] });
-    callAI.mockResolvedValue('AI response');
-    openai.audio.speech.create.mockResolvedValue({
-      arrayBuffer: async () => Buffer.from('audio data')
+    callAI.mockResolvedValue({ 
+      text: 'AI response',
+      audioFile: Buffer.from('audio data').toString('base64')
     });
 
     const res = await request(app)
@@ -54,7 +63,10 @@ describe('POST /chat', () => {
   });
 
   it('should return 500 if there is an error', async () => {
-    addTextData.mockRejectedValue(new Error('Test error'));
+    addTextData.mockResolvedValue();
+    getTexts.mockResolvedValue([]);
+    getTextsSeperated.mockResolvedValue({ userLogs: [], aiLogs: [] });
+    callAI.mockRejectedValue(new Error('AI service error'));
 
     const res = await request(app)
       .post('/chat')
@@ -67,5 +79,6 @@ describe('POST /chat', () => {
       });
 
     expect(res.status).toBe(500);
+    expect(res.body.error).toBe('AI processing failed');
   });
 });
