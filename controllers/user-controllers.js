@@ -71,19 +71,26 @@ const sendUserTranscriptsAfterDeletion = async (userId, userTranscript) => {
   });
 }
 
-const getAllUserSessions = async (userId) => {
+const getAllUserSessions = async (userId, startDate, endDate) => {
   try {
     if (!userId) {
       throw new Error('userId is required');
     }
 
-    const today = new Date();
-    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-    const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    // If no date range provided, default to current month
+    let firstDay, lastDay;
+    if (startDate && endDate) {
+      firstDay = new Date(startDate);
+      lastDay = new Date(endDate);
+    } else {
+      const today = new Date();
+      firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+      lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    }
     
     const result = await summaryRef.where("uid", '==', userId)
-      .where('time', '>=', firstDayOfMonth.toISOString())
-      .where('time', '<=', lastDayOfMonth.toISOString())
+      .where('time', '>=', firstDay.toISOString())
+      .where('time', '<=', lastDay.toISOString())
       .orderBy("time", 'desc')
       .get()
       .then((querySnapshot) => {

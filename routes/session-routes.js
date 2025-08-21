@@ -7,6 +7,13 @@ const { upsertChunksWithEmbeddings } = require('../config/pinecone')
 const { createEmbeddings } = require('../config/openAi')
 const { askForShortSummary, askForin5LongSummary, askForin3LongSummary, askForUserProfile, askForDSMScores, askForDSMScoresSpanish, englishToSpanish } = require('../utils/text')
 const { moodTable } = require('../utils/mood')
+const { sessionTextsRef } = require('../config/connection')
+const { 
+  generateSessionId, 
+  isValidSessionId, 
+  validateSessionAccess, 
+  getSessionStats 
+} = require('../utils/sessionUtils')
 const { 
   asyncHandler, 
   validateRequiredFields, 
@@ -15,13 +22,110 @@ const {
   createErrorResponse 
 } = require('../utils/errorHandler')
 
-route.post("/getAllSessions", asyncHandler(async (req, res) => {
+route.post("/createSession", asyncHandler(async (req, res) => {
   validateRequiredFields(['userId'], req.body);
   
   const { userId } = req.body;
   
   try {
-    const getAllSessionsForUser = await getAllUserSessions(userId);
+    const sessionId = generateSessionId();
+    
+    res.json({ 
+      success: true,
+      sessionId: sessionId,
+      message: 'Session created successfully'
+    });
+  } catch (error) {
+    handleDatabaseError(error, 'create session');
+  }
+}))
+
+route.post("/validateSession", asyncHandler(async (req, res) => {
+  validateRequiredFields(['userId', 'sessionId'], req.body);
+  
+  const { userId, sessionId } = req.body;
+  
+  try {
+    // Validate session ID format
+    if (!isValidSessionId(sessionId)) {
+      return res.status(400).json(createErrorResponse({
+        message: 'Invalid session ID format',
+        code: 'INVALID_SESSION_ID'
+      }));
+    }
+    
+    // Check if user has access to this session
+    const hasAccess = await validateSessionAccess(userId, sessionId, sessionTextsRef);
+    
+    if (!hasAccess) {
+      return res.status(403).json(createErrorResponse({
+        message: 'User does not have access to this session',
+        code: 'SESSION_ACCESS_DENIED'
+      }));
+    }
+    
+    // Get session statistics
+    const stats = await getSessionStats(sessionId, sessionTextsRef);
+    
+    res.json({ 
+      success: true,
+      valid: true,
+      stats: stats
+    });
+  } catch (error) {
+    handleDatabaseError(error, 'validate session');
+  }
+}))
+
+route.post("/cleanupSessions", asyncHandler(async (req, res) => {
+  validateRequiredFields(['userId'], req.body);
+  
+  const { userId, maxAge } = req.body;
+  const maxAgeHours = maxAge || 24; // Default to 24 hours
+  
+  try {
+    const cutoffTime = new Date(Date.now() - (maxAgeHours * 60 * 60 * 1000)).toISOString();
+    
+    const querySnapshot = await sessionTextsRef
+      .where("uid", "==", userId)
+      .where("time", "<", cutoffTime)
+      .get();
+    
+    if (querySnapshot.empty) {
+      return res.json({
+        success: true,
+        message: 'No old sessions found to cleanup',
+        cleanedSessions: 0
+      });
+    }
+    
+    const batch = sessionTextsRef.firestore.batch();
+    let cleanedCount = 0;
+    
+    querySnapshot.forEach(doc => {
+      batch.delete(doc.ref);
+      cleanedCount++;
+    });
+    
+    await batch.commit();
+    
+    res.json({
+      success: true,
+      message: `Cleaned up ${cleanedCount} old sessions`,
+      cleanedSessions: cleanedCount
+    });
+  } catch (error) {
+    handleDatabaseError(error, 'cleanup sessions');
+  }
+}))
+
+route.post("/getAllSessions", asyncHandler(async (req, res) => {
+  validateRequiredFields(['userId'], req.body);
+  
+  const { userId, startDate, endDate } = req.body;
+  
+  try {
+    const getAllSessionsForUser = await getAllUserSessions(userId, startDate, endDate);
     res.json({ 
       success: true,
       sessions: getAllSessionsForUser 
@@ -35,6 +139,23 @@ route.post("/getSessionTranscripts", asyncHandler(async (req, res) => {
   validateRequiredFields(['sessionId', 'userId'], req.body);
   
   const { sessionId, userId } = req.body;
+  
+  // Validate session ID format
+  if (!isValidSessionId(sessionId)) {
+    return res.status(400).json(createErrorResponse({
+      message: 'Invalid session ID format',
+      code: 'INVALID_SESSION_ID'
+    }));
+  }
+
+  // Validate user access to session
+  const hasAccess = await validateSessionAccess(userId, sessionId, sessionTextsRef);
+  if (!hasAccess) {
+    return res.status(403).json(createErrorResponse({
+      message: 'User does not have access to this session',
+      code: 'SESSION_ACCESS_DENIED'
+    }));
+  }
   
   try {
     const getAllTranscriptsForSessions = await getTextFromSummaryTable(userId, sessionId);
@@ -51,6 +172,23 @@ route.post("/endSession", asyncHandler(async (req, res) => {
   validateRequiredFields(['userId', 'sessionId', 'language', 'sessionType'], req.body);
   
   const { userId, sessionId, language, sessionType } = req.body;
+  
+  // Validate session ID format
+  if (!isValidSessionId(sessionId)) {
+    return res.status(400).json(createErrorResponse({
+      message: 'Invalid session ID format',
+      code: 'INVALID_SESSION_ID'
+    }));
+  }
+
+  // Validate user access to session
+  const hasAccess = await validateSessionAccess(userId, sessionId, sessionTextsRef);
+  if (!hasAccess) {
+    return res.status(403).json(createErrorResponse({
+      message: 'User does not have access to this session',
+      code: 'SESSION_ACCESS_DENIED'
+    }));
+  }
   
   try {
     // Step 1: Retrieve session data

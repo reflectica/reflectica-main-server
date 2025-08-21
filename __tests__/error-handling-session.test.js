@@ -1,16 +1,18 @@
 const request = require('supertest');
 const express = require('express');
+
+// Mock external dependencies before importing modules
+jest.mock('../controllers/user-controllers', () => require('./__mocks__/controllers/user-controllers'));
+jest.mock('../controllers/text-controllers', () => require('./__mocks__/controllers/text-controllers'));
+jest.mock('../config/openAi', () => require('./__mocks__/config/openAi'));
+jest.mock('../utils/text', () => require('./__mocks__/utils/text'));
+jest.mock('../config/pinecone', () => require('./__mocks__/config/pinecone'));
+jest.mock('../controllers/summary-controller', () => require('./__mocks__/controllers/summary-controller'));
+jest.mock('../config/connection', () => require('./__mocks__/config/connection'));
+
 const route = require('../routes/session-routes');
 const { getAllUserSessions } = require('../controllers/user-controllers');
 const { getTexts } = require('../controllers/text-controllers');
-
-// Mock external dependencies
-jest.mock('../controllers/user-controllers');
-jest.mock('../controllers/text-controllers');
-jest.mock('../config/openAi');
-jest.mock('../utils/text');
-jest.mock('../config/pinecone');
-jest.mock('../controllers/summary-controller');
 
 const app = express();
 app.use(express.json());
