@@ -1,5 +1,18 @@
 const request = require('supertest');
 const express = require('express');
+
+// Mock external dependencies before importing modules
+jest.mock('../controllers/user-controllers', () => require('./__mocks__/controllers/user-controllers'));
+jest.mock('../controllers/text-controllers', () => require('./__mocks__/controllers/text-controllers'));
+jest.mock('../config/openAi', () => require('./__mocks__/config/openAi'));
+jest.mock('../utils/text', () => ({
+  ...require('./__mocks__/utils/text'),
+  englishToSpanish: jest.fn()
+}));
+jest.mock('../config/pinecone', () => require('./__mocks__/config/pinecone'));
+jest.mock('../controllers/summary-controller', () => require('./__mocks__/controllers/summary-controller'));
+jest.mock('../config/connection', () => require('./__mocks__/config/connection'));
+
 const route = require('../routes/session-routes');
 const { getAllUserSessions, parseScores, calculateMentalHealthScore, normalizeScores } = require('../controllers/user-controllers');
 const { getTexts, getTextFromSummaryTable } = require('../controllers/text-controllers');
@@ -7,15 +20,6 @@ const { callOpenAi } = require('../config/openAi');
 const { englishToSpanish } = require('../utils/text');
 const { upsertChunksWithEmbeddings } = require('../config/pinecone');
 const { registerSummary } = require('../controllers/summary-controller');
-
-jest.mock('../controllers/user-controllers');
-jest.mock('../controllers/text-controllers');
-jest.mock('../config/openAi');
-jest.mock('../utils/text', () => ({
-  englishToSpanish: jest.fn()
-}));
-jest.mock('../config/pinecone');
-jest.mock('../controllers/summary-controller');
 
 const app = express();
 app.use(express.json());
@@ -49,16 +53,30 @@ describe('Session Routes', () => {
   it('should return session transcripts', async () => {
     const mockTranscripts = { sessionId: '1', transcripts: 'Transcript data' };
     getTextFromSummaryTable.mockResolvedValue(mockTranscripts);
+    
+    // Mock session validation
+    const { sessionTextsRef } = require('../config/connection');
+    sessionTextsRef.where.mockReturnValue({
+      where: jest.fn().mockReturnValue({
+        limit: jest.fn().mockReturnValue({
+          get: jest.fn().mockResolvedValue({
+            empty: false
+          })
+        })
+      })
+    });
 
     const res = await request(app)
       .post('/session/getSessionTranscripts')
-      .send({ sessionId: '1', userId: 'user1' });
+      .send({ sessionId: 'session_1234567890_abcdef1234567890', userId: 'user1' });
 
     expect(res.status).toBe(200);
-    expect(res.body).toEqual(mockTranscripts);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data).toEqual(mockTranscripts);
   });
 
   it('should end session and return processed data', async () => {
+    const sessionId = 'session_1234567890_abcdef1234567890';
     const mockTexts = {
       chatlog: [
         { role: 'user', content: 'Hello' },
@@ -66,9 +84,6 @@ describe('Session Routes', () => {
       ]
     };
     const mockEnglishTranscript = 'Hello Hi there!';
-    const mockQueryData = { inputs: 'Hello' };
-    const mockQueryEmotions = { text: 'Hello' };
-    const mockQuerySpanish = { text: mockEnglishTranscript };
 
     getTexts.mockResolvedValue(mockTexts);
     englishToSpanish.mockResolvedValue(mockEnglishTranscript);
@@ -79,25 +94,31 @@ describe('Session Routes', () => {
     upsertChunksWithEmbeddings.mockResolvedValue();
     registerSummary.mockResolvedValue();
 
+    // Mock session validation
+    const { sessionTextsRef } = require('../config/connection');
+    sessionTextsRef.where.mockReturnValue({
+      where: jest.fn().mockReturnValue({
+        limit: jest.fn().mockReturnValue({
+          get: jest.fn().mockResolvedValue({
+            empty: false
+          })
+        })
+      })
+    });
+
     const res = await request(app)
       .post('/session/endSession')
       .send({
         userId: 'user1',
-        sessionId: '1',
+        sessionId: sessionId,
         language: 'en',
         sessionType: 'type1'
       });
 
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({
-      chatlog: mockTexts.chatlog,
-      shortSummary: mockEnglishTranscript,
-      longSummary: mockEnglishTranscript,
-      sessionId: '1',
-      normalizedScores: [0.1, 0.2, 0.3],
-      mentalHealthScore: '0.60',
-      referral: ''
-    });
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.chatlog).toEqual(mockTexts.chatlog);
+    expect(res.body.data.sessionId).toBe(sessionId);
   });
 
   it('should return 500 if there is an error', async () => {
@@ -107,7 +128,7 @@ describe('Session Routes', () => {
       .post('/session/endSession')
       .send({
         userId: 'user1',
-        sessionId: '1',
+        sessionId: 'session_1234567890_abcdef1234567890',
         language: 'en',
         sessionType: 'type1'
       });

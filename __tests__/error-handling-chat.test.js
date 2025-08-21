@@ -2,10 +2,10 @@ const request = require('supertest');
 const express = require('express');
 
 // Mock dependencies before importing the route
-jest.mock('../config/connection');
-jest.mock('../config/openAi');
-jest.mock('../config/pinecone');
-jest.mock('../controllers/text-controllers');
+jest.mock('../config/connection', () => require('./__mocks__/config/connection'));
+jest.mock('../config/openAi', () => require('./__mocks__/config/openAi'));
+jest.mock('../config/pinecone', () => require('./__mocks__/config/pinecone'));
+jest.mock('../controllers/text-controllers', () => require('./__mocks__/controllers/text-controllers'));
 
 const route = require('../routes/chat-routes');
 const { addTextData, getTexts, getTextsSeperated } = require('../controllers/text-controllers');
