@@ -16,12 +16,9 @@ const emailAllUserTranscripts = async (userId) => {
 
     let returnData = ""
     querySnapshot.forEach((doc) => {
-      console.log("doc data",doc.data())
       const stringSession = `${JSON.stringify(doc.data().chatlog)} \n`
-      console.log("stringSession",stringSession)
       returnData += stringSession
     });
-    console.log("returnData",returnData)
     return returnData
   })
   await sendUserTranscriptsAfterDeletion(userId, allTranscriptsForUser)
@@ -45,7 +42,7 @@ const userEmotions = async (data) => {
       }
     );
 
-    console.log(response.data);
+    console.log("Emotion analysis completed successfully");
     return response.data;
   } catch (error) {
     console.error('Error in userEmotions:', error);
@@ -54,7 +51,7 @@ const userEmotions = async (data) => {
 };
 
 const sendUserTranscriptsAfterDeletion = async (userId, userTranscript) => {
-  console.log("userTranscripts",userTranscript)
+  console.log("Sending user deletion notification for user:", userId);
   const mailOptions = {
     from: 'reflectica.ai@gmail.com',
     to: 'reflectica.ai@gmail.com',

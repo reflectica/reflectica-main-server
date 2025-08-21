@@ -86,11 +86,10 @@ const globalErrorHandler = (error, req, res, next) => {
   console.error('Error:', {
     message: error.message,
     code: error.code,
-    stack: error.stack,
     timestamp: new Date().toISOString(),
     url: req.url,
     method: req.method,
-    body: req.body
+    userId: req.body?.userId || 'unknown' // Only log user ID, not full body
   });
 
   // Handle operational errors
@@ -113,13 +112,22 @@ const globalErrorHandler = (error, req, res, next) => {
 
 /**
  * Validates required fields in request body
+ * Special handling for prompt field to allow empty strings through for specific validation
  */
 const validateRequiredFields = (fields, body) => {
   const missingFields = [];
   
   for (const field of fields) {
-    if (!body[field] || (typeof body[field] === 'string' && body[field].trim() === '')) {
-      missingFields.push(field);
+    if (field === 'prompt') {
+      // For prompt, only check if it exists as a property, not if it's empty
+      if (!body.hasOwnProperty(field) || body[field] === null || body[field] === undefined) {
+        missingFields.push(field);
+      }
+    } else {
+      // For other fields, check if they exist and are not empty strings
+      if (!body[field] || (typeof body[field] === 'string' && body[field].trim() === '')) {
+        missingFields.push(field);
+      }
     }
   }
   
@@ -135,7 +143,7 @@ const validateRequiredFields = (fields, body) => {
  * Handles database operation errors
  */
 const handleDatabaseError = (error, operation = 'database operation') => {
-  console.error(`Database error during ${operation}:`, error);
+  console.error(`Database error during ${operation} - ${error.message}`);
   
   if (error.code === 'permission-denied') {
     throw new DatabaseError('Access denied to database resource');
@@ -156,11 +164,10 @@ const handleDatabaseError = (error, operation = 'database operation') => {
  * Handles external service errors with retry logic
  */
 const handleExternalServiceError = (error, serviceName, operation = 'operation') => {
-  console.error(`${serviceName} error during ${operation}:`, error);
+  console.error(`${serviceName} error during ${operation} - service unavailable`);
   
   if (error.response) {
     const status = error.response.status;
-    const message = error.response.data?.error?.message || error.message;
     
     if (status === 401 || status === 403) {
       throw new ExternalServiceError(serviceName, 'Authentication failed');
@@ -174,14 +181,90 @@ const handleExternalServiceError = (error, serviceName, operation = 'operation')
       throw new ExternalServiceError(serviceName, 'Service temporarily unavailable');
     }
     
-    throw new ExternalServiceError(serviceName, message);
+    throw new ExternalServiceError(serviceName, 'Service error occurred');
   }
   
   if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
     throw new NetworkError(`Unable to connect to ${serviceName}`);
   }
   
-  throw new ExternalServiceError(serviceName, error.message || 'Unknown service error');
+  throw new ExternalServiceError(serviceName, 'Unknown service error');
+};
+
+/**
+ * Sanitizes string input to prevent potential security issues
+ */
+const sanitizeString = (input, maxLength = 1000) => {
+  if (typeof input !== 'string') {
+    return '';
+  }
+  
+  // Remove potentially dangerous characters and limit length
+  return input
+    .trim()
+    .replace(/[<>]/g, '') // Remove HTML angle brackets
+    .replace(/javascript:/gi, '') // Remove javascript: protocol
+    .replace(/data:/gi, '') // Remove data: protocol
+    .slice(0, maxLength);
+};
+
+/**
+ * Validates and sanitizes user input for prompts/messages
+ */
+const validateAndSanitizePrompt = (prompt) => {
+  if (!prompt || typeof prompt !== 'string') {
+    throw new ValidationError('Prompt must be a non-empty string', 'prompt');
+  }
+  
+  const sanitized = sanitizeString(prompt, 5000); // Allow longer prompts
+  
+  if (sanitized.length === 0) {
+    throw new ValidationError('Prompt must be a non-empty string', 'prompt');
+  }
+  
+  return sanitized;
+};
+
+/**
+ * Validates user ID format
+ */
+const validateUserId = (userId) => {
+  if (!userId || typeof userId !== 'string') {
+    throw new ValidationError('User ID is required', 'userId');
+  }
+  
+  // Allow alphanumeric, underscores, hyphens, and dots
+  if (!/^[a-zA-Z0-9_.-]+$/.test(userId) || userId.length > 100) {
+    throw new ValidationError('Invalid user ID format', 'userId');
+  }
+  
+  return userId;
+};
+
+/**
+ * Validates therapy mode
+ */
+const validateTherapyMode = (therapyMode) => {
+  const validModes = ['CBT', 'REBT', 'DBT', 'ACT'];
+  
+  if (!therapyMode || !validModes.includes(therapyMode)) {
+    throw new ValidationError(`Invalid therapy mode. Must be one of: ${validModes.join(', ')}`, 'therapyMode');
+  }
+  
+  return therapyMode;
+};
+
+/**
+ * Validates session type
+ */
+const validateSessionType = (sessionType) => {
+  const validTypes = ['individual', 'group', 'diagnostic'];
+  
+  if (!sessionType || !validTypes.includes(sessionType)) {
+    throw new ValidationError(`Invalid session type. Must be one of: ${validTypes.join(', ')}`, 'sessionType');
+  }
+  
+  return sessionType;
 };
 
 module.exports = {
@@ -195,5 +278,10 @@ module.exports = {
   globalErrorHandler,
   validateRequiredFields,
   handleDatabaseError,
-  handleExternalServiceError
+  handleExternalServiceError,
+  sanitizeString,
+  validateAndSanitizePrompt,
+  validateUserId,
+  validateTherapyMode,
+  validateSessionType
 };

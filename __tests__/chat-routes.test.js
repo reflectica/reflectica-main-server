@@ -53,8 +53,8 @@ describe('POST /chat', () => {
         prompt: 'Hello',
         userId: 'user1',
         sessionId: 'session_1234567890_abcdef1234567890',
-        therapyMode: 'mode1',
-        sessionType: 'type1'
+        therapyMode: 'CBT',
+        sessionType: 'individual'
       });
 
     expect(res.status).toBe(200);
@@ -71,8 +71,8 @@ describe('POST /chat', () => {
         prompt: 'Hello',
         userId: 'user1',
         sessionId: 'session1',
-        therapyMode: 'mode1',
-        sessionType: 'type1'
+        therapyMode: 'CBT',
+        sessionType: 'individual'
       });
 
     expect(res.status).toBe(500);

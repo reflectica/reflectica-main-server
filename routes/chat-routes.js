@@ -14,21 +14,23 @@ const {
   validateRequiredFields, 
   handleDatabaseError, 
   handleExternalServiceError,
-  createErrorResponse 
+  createErrorResponse,
+  validateAndSanitizePrompt,
+  validateUserId,
+  validateTherapyMode,
+  validateSessionType
 } = require('../utils/errorHandler');
 
 route.post("/", asyncHandler(async (req, res) => {
   validateRequiredFields(['prompt', 'userId', 'sessionId', 'therapyMode', 'sessionType'], req.body);
   
-  const { prompt, userId, sessionId, therapyMode, sessionType } = req.body;
+  let { prompt, userId, sessionId, therapyMode, sessionType } = req.body;
 
-  // Additional validation for prompt content
-  if (typeof prompt !== 'string' || prompt.trim().length === 0) {
-    return res.status(400).json(createErrorResponse({
-      message: 'Prompt must be a non-empty string',
-      code: 'INVALID_PROMPT'
-    }));
-  }
+  // Validate and sanitize inputs
+  prompt = validateAndSanitizePrompt(prompt);
+  userId = validateUserId(userId);
+  therapyMode = validateTherapyMode(therapyMode);
+  sessionType = validateSessionType(sessionType);
 
   // Validate session ID format
   if (!isValidSessionId(sessionId)) {
@@ -85,7 +87,7 @@ route.post("/", asyncHandler(async (req, res) => {
 
     // Append the current prompt to the conversation history
     const combinedPrompt = conversationHistory + `User: ${prompt}\nAI:`;
-    console.log("Combined Prompt:", combinedPrompt);
+    console.log("Chat request processed for user session");
     console.log("therapy type:", sessionType);
     console.log("therapy mode:", therapyMode);
 
@@ -98,7 +100,7 @@ route.post("/", asyncHandler(async (req, res) => {
         throw new Error('Invalid AI response received');
       }
       
-      console.log("AI Response:", aiResponse.text);
+      console.log("AI response generated successfully");
     } catch (error) {
       console.error('AI processing error:', error);
       handleExternalServiceError(error, 'OpenAI', 'generate chat response');
@@ -124,7 +126,7 @@ route.post("/", asyncHandler(async (req, res) => {
       }
     }
 
-    console.log("Final getData:", getData);
+    console.log("Chat session completed successfully");
 
     // Step 7: Send successful response
     res.json({
