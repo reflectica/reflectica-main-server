@@ -36,14 +36,25 @@ const userEmotions = async (data) => {
         headers: {
           'Content-Type': 'application/json',
         },
+        timeout: 10000, // 10 second timeout
       }
     );
 
     console.log(response.data);
     return response.data;
   } catch (error) {
-    console.error('Error:', error.response ? error.response.statusText : error.message);
-    throw new Error(`HTTP error! status: ${error.response ? error.response.status : 'unknown'}`);
+    console.error('Error analyzing emotions:', error.response ? error.response.statusText : error.message);
+    
+    // Provide fallback response for emotion analysis
+    if (error.code === 'ECONNABORTED') {
+      throw new Error('Emotion analysis timed out. Please try again.');
+    } else if (error.response && error.response.status >= 500) {
+      throw new Error('Emotion analysis service is temporarily unavailable.');
+    } else if (error.response && error.response.status === 429) {
+      throw new Error('Too many requests to emotion analysis service. Please try again later.');
+    } else {
+      throw new Error('Unable to analyze emotions at this time.');
+    }
   }
 };
 
@@ -66,29 +77,36 @@ const sendUserTranscriptsAfterDeletion = async (userId, userTranscript) => {
 }
 
 const getAllUserSessions = async (userId) => {
-  const today = new Date();
-  const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-  const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-  const result = await summaryRef.where("uid", '==', userId)
-    .where('time', '>=', firstDayOfMonth.toISOString())
-    .where('time', '<=', lastDayOfMonth.toISOString())
-    .orderBy("time", 'desc')
-    .get()
-    .then((querySnapshot) => {
-      if (querySnapshot.empty) {
-        console.log('No matching documents.');
-        return;
-      }
-      const resultArray = []
-      querySnapshot.forEach((doc) => {
-        resultArray.push(doc.data())
+  try {
+    const today = new Date();
+    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    
+    const result = await summaryRef.where("uid", '==', userId)
+      .where('time', '>=', firstDayOfMonth.toISOString())
+      .where('time', '<=', lastDayOfMonth.toISOString())
+      .orderBy("time", 'desc')
+      .get()
+      .then((querySnapshot) => {
+        if (querySnapshot.empty) {
+          console.log('No matching documents.');
+          return { summaryData: [], totalSessions: 0 };
+        }
+        const resultArray = []
+        querySnapshot.forEach((doc) => {
+          resultArray.push(doc.data())
+        });
+        return { summaryData: resultArray, totalSessions: resultArray.length}
+      })
+      .catch((error) => {
+        console.error('Error getting documents: ', error);
+        throw new Error('Failed to retrieve user sessions');
       });
-      return { summaryData: resultArray, totalSessions: resultArray.length}
-    })
-    .catch((error) => {
-      console.error('Error getting documents: ', error);
-    });
-  return result
+    return result;
+  } catch (error) {
+    console.error('Error in getAllUserSessions:', error);
+    throw error;
+  }
 }
 
 const deleteAllUserSummaries = async (uid) => {

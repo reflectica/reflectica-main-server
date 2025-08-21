@@ -3,21 +3,37 @@ const path = require('path');
 const { addTextData } = require('../controllers/text-controllers');
 
 route.get("/", async (req, res) => {
-  const r = await fetch("https://api.openai.com/v1/realtime/sessions", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "gpt-4o-mini-realtime-preview",
-      voice: "sage",
-    }),
-  });
-  const data = await r.json();
-
-  // Send back the JSON we received from the OpenAI REST API
-  res.send(data);
+  try {
+    const r = await fetch("https://api.openai.com/v1/realtime/sessions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini-realtime-preview",
+        voice: "sage",
+      }),
+    });
+    
+    if (!r.ok) {
+      const errorText = await r.text();
+      console.error('OpenAI API error:', r.status, errorText);
+      return res.status(500).json({ 
+        error: 'Unable to create audio session', 
+        message: 'There was an issue setting up the audio session. Please try again later.' 
+      });
+    }
+    
+    const data = await r.json();
+    res.status(200).json(data);
+  } catch (error) {
+    console.error('Error creating audio session:', error);
+    res.status(500).json({ 
+      error: 'Audio service unavailable', 
+      message: 'The audio service is currently unavailable. Please try again later.' 
+    });
+  }
 });
 // In your backend audio routes
 route.post('/openai-proxy', async (req, res) => {
@@ -54,15 +70,26 @@ route.post('/openai-proxy', async (req, res) => {
 });
 
 route.post("/transcript", async (req, res) => {
-  const { userId, sessionId, role, message } = req.body;
-
   try {
+    const { userId, sessionId, role, message } = req.body;
+
+    if (!userId || !sessionId || !role || !message) {
+      return res.status(400).json({ 
+        error: 'Missing required parameters', 
+        message: 'User ID, session ID, role, and message are all required.' 
+      });
+    }
+
     // Log the incoming message with the specified role
     await addTextData(userId, role, message, sessionId);
-    res.send({ success: true });
-  } catch (e) {
-    console.log(e);
-    res.status(500).send({ success: false, error: e.message });
+    res.status(200).json({ success: true });
+  } catch (error) {
+    console.error('Error saving transcript:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Unable to save transcript', 
+      message: 'There was an issue saving the transcript. Please try again.' 
+    });
   }
 });
 
