@@ -44,7 +44,7 @@ const validateSessionAccess = async (userId, sessionId, sessionTextsRef) => {
     
     return !querySnapshot.empty;
   } catch (error) {
-    console.error('Error validating session access:', error);
+    console.error('Error validating session access - database query failed');
     return false;
   }
 };
@@ -88,7 +88,7 @@ const getSessionStats = async (sessionId, sessionTextsRef) => {
       lastActivity
     };
   } catch (error) {
-    console.error('Error getting session stats:', error);
+    console.error('Error getting session stats - database query failed');
     return {
       exists: false,
       messageCount: 0,

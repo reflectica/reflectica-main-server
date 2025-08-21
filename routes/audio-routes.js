@@ -6,7 +6,9 @@ const {
   validateRequiredFields, 
   handleDatabaseError, 
   handleExternalServiceError,
-  createErrorResponse 
+  createErrorResponse,
+  validateUserId,
+  sanitizeString
 } = require('../utils/errorHandler');
 
 route.get("/", asyncHandler(async (req, res) => {
@@ -75,8 +77,8 @@ route.post('/openai-proxy', asyncHandler(async (req, res) => {
     
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('❌ OpenAI API error:', response.status, errorText);
-      throw new Error(`OpenAI API returned ${response.status}: ${errorText}`);
+      console.error('❌ OpenAI API error:', response.status);
+      throw new Error(`OpenAI API returned ${response.status}`);
     }
     
     const data = await response.text();
@@ -84,7 +86,7 @@ route.post('/openai-proxy', asyncHandler(async (req, res) => {
     
     res.status(200).send(data);
   } catch (error) {
-    console.error('❌ OpenAI proxy error:', error.message);
+    console.error('❌ OpenAI proxy error - service unavailable');
     handleExternalServiceError(error, 'OpenAI Realtime', 'proxy SDP request');
   }
 }));
@@ -92,7 +94,8 @@ route.post('/openai-proxy', asyncHandler(async (req, res) => {
 route.post("/transcript", asyncHandler(async (req, res) => {
   validateRequiredFields(['userId', 'sessionId', 'role', 'message'], req.body);
   
-  const { userId, sessionId, role, message } = req.body;
+  const userId = validateUserId(req.body.userId);
+  const { sessionId, role, message } = req.body;
 
   // Validate role
   const validRoles = ['user', 'assistant', 'system'];
@@ -104,8 +107,9 @@ route.post("/transcript", asyncHandler(async (req, res) => {
     }));
   }
 
-  // Validate message content
-  if (typeof message !== 'string' || message.trim().length === 0) {
+  // Validate and sanitize message content
+  const sanitizedMessage = sanitizeString(message, 5000);
+  if (sanitizedMessage.length === 0) {
     return res.status(400).json(createErrorResponse({
       message: 'Message must be a non-empty string',
       code: 'INVALID_MESSAGE',
@@ -115,7 +119,7 @@ route.post("/transcript", asyncHandler(async (req, res) => {
 
   try {
     // Log the incoming message with the specified role
-    await addTextData(userId, role, message.trim(), sessionId);
+    await addTextData(userId, role, sanitizedMessage, sessionId);
     
     res.json({ 
       success: true,

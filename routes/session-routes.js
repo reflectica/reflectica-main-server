@@ -19,13 +19,14 @@ const {
   validateRequiredFields, 
   handleDatabaseError, 
   handleExternalServiceError,
-  createErrorResponse 
+  createErrorResponse,
+  validateUserId
 } = require('../utils/errorHandler')
 
 route.post("/createSession", asyncHandler(async (req, res) => {
   validateRequiredFields(['userId'], req.body);
   
-  const { userId } = req.body;
+  const userId = validateUserId(req.body.userId);
   
   try {
     const sessionId = generateSessionId();
@@ -43,7 +44,8 @@ route.post("/createSession", asyncHandler(async (req, res) => {
 route.post("/validateSession", asyncHandler(async (req, res) => {
   validateRequiredFields(['userId', 'sessionId'], req.body);
   
-  const { userId, sessionId } = req.body;
+  const userId = validateUserId(req.body.userId);
+  const { sessionId } = req.body;
   
   try {
     // Validate session ID format
@@ -80,7 +82,8 @@ route.post("/validateSession", asyncHandler(async (req, res) => {
 route.post("/cleanupSessions", asyncHandler(async (req, res) => {
   validateRequiredFields(['userId'], req.body);
   
-  const { userId, maxAge } = req.body;
+  const userId = validateUserId(req.body.userId);
+  const { maxAge } = req.body;
   const maxAgeHours = maxAge || 24; // Default to 24 hours
   
   try {
@@ -122,7 +125,8 @@ route.post("/cleanupSessions", asyncHandler(async (req, res) => {
 route.post("/getAllSessions", asyncHandler(async (req, res) => {
   validateRequiredFields(['userId'], req.body);
   
-  const { userId, startDate, endDate } = req.body;
+  const userId = validateUserId(req.body.userId);
+  const { startDate, endDate } = req.body;
   
   try {
     const getAllSessionsForUser = await getAllUserSessions(userId, startDate, endDate);
@@ -138,7 +142,8 @@ route.post("/getAllSessions", asyncHandler(async (req, res) => {
 route.post("/getSessionTranscripts", asyncHandler(async (req, res) => {
   validateRequiredFields(['sessionId', 'userId'], req.body);
   
-  const { sessionId, userId } = req.body;
+  const userId = validateUserId(req.body.userId);
+  const { sessionId } = req.body;
   
   // Validate session ID format
   if (!isValidSessionId(sessionId)) {
@@ -171,7 +176,8 @@ route.post("/getSessionTranscripts", asyncHandler(async (req, res) => {
 route.post("/endSession", asyncHandler(async (req, res) => {
   validateRequiredFields(['userId', 'sessionId', 'language', 'sessionType'], req.body);
   
-  const { userId, sessionId, language, sessionType } = req.body;
+  const userId = validateUserId(req.body.userId);
+  const { sessionId, language, sessionType } = req.body;
   
   // Validate session ID format
   if (!isValidSessionId(sessionId)) {
@@ -396,14 +402,12 @@ route.post("/endSession", asyncHandler(async (req, res) => {
       // Don't fail the entire request if cleanup fails
     }
 
-    console.log({
-      chatlog: getData.chatlog,
-      shortSummary: shortSummary,
-      dsmScore: dsmScore,
-      longSummary: longSummary,
+    console.log("Session ended successfully", {
       sessionId: sessionId,
+      userId: userId,
+      messageCount: getData.chatlog ? getData.chatlog.length : 0,
       mood: userMoodPercentage,
-      referral: referralRecommendation,
+      hasReferral: !!referralRecommendation,
     });
 
     // Step 11: Send successful response

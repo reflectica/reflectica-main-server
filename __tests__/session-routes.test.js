@@ -112,7 +112,7 @@ describe('Session Routes', () => {
         userId: 'user1',
         sessionId: sessionId,
         language: 'en',
-        sessionType: 'type1'
+        sessionType: 'individual'
       });
 
     expect(res.status).toBe(200);
@@ -130,7 +130,7 @@ describe('Session Routes', () => {
         userId: 'user1',
         sessionId: 'session_1234567890_abcdef1234567890',
         language: 'en',
-        sessionType: 'type1'
+        sessionType: 'individual'
       });
 
     expect(res.status).toBe(500);

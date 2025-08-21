@@ -19,7 +19,6 @@ const getTextFromSummaryTable = async (sessionId, uid) => {
         querySnapshot.forEach((doc) => {
           returnData = doc.data().chatLog
         });
-        console.log(returnData)
         return returnData
       })
 
@@ -47,7 +46,6 @@ const getTexts = async (uid, sessionId) => {
         }
         let resultObject;
         querySnapshot.forEach((doc) => {
-          console.log(doc.data())
           resultObject = { chatlog: doc.data().chatlog, aiLog: doc.data().message }
         });
         return resultObject
@@ -79,7 +77,6 @@ const getTextsSeperated = async (uid, sessionId) => {
     let aiLogs = [];
     querySnapshot.forEach((doc) => {
       const data = doc.data();
-      console.log(data);
 
       // Assuming chatlog contains both user and AI messages, you need to separate them
       data.chatlog.forEach(log => {
