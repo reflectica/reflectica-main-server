@@ -4,62 +4,117 @@ const route = require('express').Router();
 const { callAI, openai } = require('../config/openAi');
 const { addTextData, getTexts, getTextsSeperated } = require('../controllers/text-controllers');
 const { searchDocs } = require('../config/pinecone');
+const { 
+  asyncHandler, 
+  validateRequiredFields, 
+  handleDatabaseError, 
+  handleExternalServiceError,
+  createErrorResponse 
+} = require('../utils/errorHandler');
 
-route.post("/", async (req, res) => {
-  const { prompt, userId, sessionId, therapyMode, sessionType } = req.body; // Extract therapyMode
+route.post("/", asyncHandler(async (req, res) => {
+  validateRequiredFields(['prompt', 'userId', 'sessionId', 'therapyMode', 'sessionType'], req.body);
+  
+  const { prompt, userId, sessionId, therapyMode, sessionType } = req.body;
 
-  if (!therapyMode) {
-    return res.status(400).json({ error: 'Missing therapyMode parameter.' });
+  // Additional validation for prompt content
+  if (typeof prompt !== 'string' || prompt.trim().length === 0) {
+    return res.status(400).json(createErrorResponse({
+      message: 'Prompt must be a non-empty string',
+      code: 'INVALID_PROMPT'
+    }));
   }
 
   try {
-    // Log user message
-    await addTextData(userId, "user", prompt, sessionId);
+    // Step 1: Log user message with error handling
+    try {
+      await addTextData(userId, "user", prompt.trim(), sessionId);
+    } catch (error) {
+      handleDatabaseError(error, 'save user message');
+    }
 
-    // Retrieve conversation history
-    const getData = await getTexts(userId, sessionId);
-    const { userLogs, aiLogs } = await getTextsSeperated(userId, sessionId);
+    // Step 2: Retrieve conversation history with error handling
+    let getData, userLogs, aiLogs;
+    try {
+      getData = await getTexts(userId, sessionId);
+      const separatedLogs = await getTextsSeperated(userId, sessionId);
+      userLogs = separatedLogs.userLogs;
+      aiLogs = separatedLogs.aiLogs;
+    } catch (error) {
+      handleDatabaseError(error, 'retrieve conversation history');
+    }
 
-    // Build conversation history string
+    // Step 3: Build conversation history string
     let conversationHistory = '';
-    userLogs.forEach((log, index) => {
-      conversationHistory += `User: ${log.content}\n`;
-      if (aiLogs[index]) {
-        conversationHistory += `AI: ${aiLogs[index].content}\n`;
-      }
-    });
+    try {
+      userLogs.forEach((log, index) => {
+        conversationHistory += `User: ${log.content}\n`;
+        if (aiLogs[index]) {
+          conversationHistory += `AI: ${aiLogs[index].content}\n`;
+        }
+      });
+    } catch (error) {
+      console.warn('Error building conversation history:', error);
+      conversationHistory = `User: ${prompt}\n`; // Fallback to current prompt only
+    }
 
     // Append the current prompt to the conversation history
     const combinedPrompt = conversationHistory + `User: ${prompt}\nAI:`;
     console.log("Combined Prompt:", combinedPrompt);
+    console.log("therapy type:", sessionType);
+    console.log("therapy mode:", therapyMode);
 
-    let textResponse;
-    console.log(getData);
+    // Step 4: Get AI response with comprehensive error handling
+    let aiResponse;
     try {
-      // Pass combinedPrompt and therapyMode to callAI
-      console.log("therapy type:", sessionType )
-      console.log("therapy mode:", therapyMode)
-      const aiResponse = await callAI(combinedPrompt, therapyMode, sessionType);
-      const textResponse = aiResponse.text;
-      const audioFilePath = aiResponse.audioFile;    
-      console.log("AI Response:", textResponse);
-
-      // Log AI's response
-      await addTextData(userId, "assistant", textResponse, sessionId);
-
-      res.send({ audio: audioFilePath });
-
-    } catch (e) {
-      console.log(e);
-      res.status(500).send(e);
+      aiResponse = await callAI(combinedPrompt, therapyMode, sessionType);
+      
+      if (!aiResponse || !aiResponse.text) {
+        throw new Error('Invalid AI response received');
+      }
+      
+      console.log("AI Response:", aiResponse.text);
+    } catch (error) {
+      console.error('AI processing error:', error);
+      handleExternalServiceError(error, 'OpenAI', 'generate chat response');
     }
 
-    console.log(getData);
+    // Step 5: Log AI's response with error handling
+    try {
+      await addTextData(userId, "assistant", aiResponse.text, sessionId);
+    } catch (error) {
+      console.warn('Failed to save AI response:', error);
+      // Don't fail the entire request if we can't save the AI response
+    }
 
-  } catch (e) {
-    console.log(e);
-    res.status(500).send(e);
+    // Step 6: Handle audio response
+    let audioResponse = null;
+    if (aiResponse.audioFile) {
+      try {
+        // Validate audio file exists and is accessible
+        audioResponse = aiResponse.audioFile;
+      } catch (error) {
+        console.warn('Audio processing error:', error);
+        // Continue without audio if there's an issue
+      }
+    }
+
+    console.log("Final getData:", getData);
+
+    // Step 7: Send successful response
+    res.json({
+      success: true,
+      data: {
+        text: aiResponse.text,
+        audio: audioResponse,
+        sessionId: sessionId
+      }
+    });
+
+  } catch (error) {
+    console.error('Chat processing error:', error);
+    throw error; // Will be caught by asyncHandler and sent to global error handler
   }
-});
+}));
 
 module.exports = route;

@@ -7,150 +7,288 @@ const { upsertChunksWithEmbeddings } = require('../config/pinecone')
 const { createEmbeddings } = require('../config/openAi')
 const { askForShortSummary, askForin5LongSummary, askForin3LongSummary, askForUserProfile, askForDSMScores, askForDSMScoresSpanish, englishToSpanish } = require('../utils/text')
 const { moodTable } = require('../utils/mood')
+const { 
+  asyncHandler, 
+  validateRequiredFields, 
+  handleDatabaseError, 
+  handleExternalServiceError,
+  createErrorResponse 
+} = require('../utils/errorHandler')
 
-route.post("/getAllSessions", async (req, res) => {
+route.post("/getAllSessions", asyncHandler(async (req, res) => {
+  validateRequiredFields(['userId'], req.body);
+  
   const { userId } = req.body;
-  const getAllSessionsForUser = await getAllUserSessions(userId);
-  res.send({ sessions: getAllSessionsForUser })
-})
+  
+  try {
+    const getAllSessionsForUser = await getAllUserSessions(userId);
+    res.json({ 
+      success: true,
+      sessions: getAllSessionsForUser 
+    });
+  } catch (error) {
+    handleDatabaseError(error, 'retrieve user sessions');
+  }
+}))
 
-route.post("/getSessionTranscripts", async (req, res) => {
+route.post("/getSessionTranscripts", asyncHandler(async (req, res) => {
+  validateRequiredFields(['sessionId', 'userId'], req.body);
+  
   const { sessionId, userId } = req.body;
-  const getAllTranscriptsForSessions = await getTextFromSummaryTable(userId, sessionId)
-  res.send(getAllTranscriptsForSessions)
-})
-
-route.post("/endSession", async (req, res) => {
-  const { userId, sessionId, language, sessionType } = req.body; // Include 'language' from the request body
-  const getData = await getTexts(userId, sessionId);
-
-  const userMessages = getData.chatlog
-    .filter(entry => entry.role === 'user')
-    .map(entry => entry.content)
-    .join(' ');
-
-  const fullSessionTranscript = getData.chatlog
-    .map(entry => `[${entry.role}] ${entry.content}`)
-    .join('\n');
-
-  let cleanedText = userMessages.replace(/\n/g, ' ');
-  const spanishTranscipt = getData.chatlog.concat(englishToSpanish);
-  const englishTranscript = await callOpenAi(spanishTranscipt);
-  const queryData = { "inputs": userMessages };
-  const queryEmotions = { "text": userMessages };
-  console.log("queryemotions", queryEmotions)
-  const querySpanish = {"text": englishTranscript}
-
-  const shortSummaryQuestion = getData.chatlog.concat(askForShortSummary);
-  const userDocumentQuestion = getData.chatlog.concat(askForUserProfile);
-  let dsmScoreQuestion;
-  if (language === 'es-ES') {
-    dsmScoreQuestion = getData.chatlog.concat(askForDSMScoresSpanish);
-  } else {
-    dsmScoreQuestion = getData.chatlog.concat(askForDSMScores);
+  
+  try {
+    const getAllTranscriptsForSessions = await getTextFromSummaryTable(userId, sessionId);
+    res.json({
+      success: true,
+      data: getAllTranscriptsForSessions
+    });
+  } catch (error) {
+    handleDatabaseError(error, 'retrieve session transcripts');
   }
+}))
 
-  let longSummaryQuestion;
-  if (getData.chatlog.length >= 10) {
-    longSummaryQuestion = getData.chatlog.concat(askForin5LongSummary);
-  } else {
-    longSummaryQuestion = getData.chatlog.concat(askForin3LongSummary);
-  }
-
-  const analyzeUser = await getSentiment(userId, sessionId);
-  const shortSummary = await callOpenAi(shortSummaryQuestion);
-  const dsmScore = await callOpenAi(dsmScoreQuestion); // Get DSM scores
-  const userDocument = await callOpenAi(userDocumentQuestion);
-  const longSummary = await callOpenAi(longSummaryQuestion);
-
-  // Conditionally handle emotions based on language
-  let emotions;
-  if (language === 'es-ES') {
-    emotions = await userEmotions(JSON.stringify(querySpanish));
-  } else {
-    emotions = await userEmotions(JSON.stringify({ text: cleanedText }));
-    
-  }
-
-  const rawScores = parseScores(dsmScore);
-  const normalizedScores = normalizeScores(rawScores);
-  const mentalHealthScore = calculateMentalHealthScore(normalizedScores).toFixed(2);
-
-  // Create the referral prompt by combining DSM scores and user messages
-const referralPrompt = [
-    {
-      role: "system",
-      content: `You are a mental health referral bot. Analyze the following DSM scores and patient transcript to recommend a specialized therapy. Choose from the following areas:
-      
-      1. Depression/Anxiety
-      2. Trauma and PTSD
-      3. Family and Relationship Issues
-      4. Substance Abuse/Addiction
-      5. Grief and Loss
-
-      DSM Scores: ${JSON.stringify(rawScores)}
-
-      Transcript: ${userMessages}
-
-      At the end of your response, include the entire session transcript.
-
-      Respond in this format:
-      
-      Recommended Specialization: [Specialization]
-      Reason: [Explanation based on DSM scores and transcript]
-      Summary for Clinicians: [Concise summary of the patient's current situation]
-      Severity Assessment (1-5): [Number indicating current severity level, 5 = most critical]
-      Priority Ranking (1-5): [Number indicating how urgently care is needed, 5 = most urgent]
-
-      Full Session Transcript: [The entire session transcript here, exactly as provided below.]
-
-      =====
-
-      Full Session Transcript to Include:
-      ${fullSessionTranscript}
-      `
+route.post("/endSession", asyncHandler(async (req, res) => {
+  validateRequiredFields(['userId', 'sessionId', 'language', 'sessionType'], req.body);
+  
+  const { userId, sessionId, language, sessionType } = req.body;
+  
+  try {
+    // Step 1: Retrieve session data
+    let getData;
+    try {
+      getData = await getTexts(userId, sessionId);
+      if (!getData || !getData.chatlog || getData.chatlog.length === 0) {
+        return res.status(404).json(createErrorResponse({
+          message: 'No session data found for the provided userId and sessionId',
+          code: 'SESSION_NOT_FOUND'
+        }));
+      }
+    } catch (error) {
+      handleDatabaseError(error, 'retrieve session data');
     }
-  ];
 
+    // Step 2: Process chat messages
+    const userMessages = getData.chatlog
+      .filter(entry => entry.role === 'user')
+      .map(entry => entry.content)
+      .join(' ');
 
+    const fullSessionTranscript = getData.chatlog
+      .map(entry => `[${entry.role}] ${entry.content}`)
+      .join('\n');
 
-  // Call OpenAI with the combined prompt to get the referral recommendation
+    if (!userMessages.trim()) {
+      return res.status(400).json(createErrorResponse({
+        message: 'Session contains no user messages to process',
+        code: 'NO_USER_MESSAGES'
+      }));
+    }
 
-  referralRecommendation = await callOpenAi(referralPrompt);
+    let cleanedText = userMessages.replace(/\n/g, ' ');
+    const spanishTranscipt = getData.chatlog.concat(englishToSpanish);
+    
+    // Step 3: Prepare OpenAI queries
+    const queryData = { "inputs": userMessages };
+    const queryEmotions = { "text": userMessages };
+    const querySpanish = {"text": cleanedText}; // Will be updated after translation
+    
+    const shortSummaryQuestion = getData.chatlog.concat(askForShortSummary);
+    const userDocumentQuestion = getData.chatlog.concat(askForUserProfile);
+    
+    let dsmScoreQuestion;
+    if (language === 'es-ES') {
+      dsmScoreQuestion = getData.chatlog.concat(askForDSMScoresSpanish);
+    } else {
+      dsmScoreQuestion = getData.chatlog.concat(askForDSMScores);
+    }
 
+    let longSummaryQuestion;
+    if (getData.chatlog.length >= 10) {
+      longSummaryQuestion = getData.chatlog.concat(askForin5LongSummary);
+    } else {
+      longSummaryQuestion = getData.chatlog.concat(askForin3LongSummary);
+    }
 
-  // Log results for debugging
-  console.log("Referral Recommendation:", referralRecommendation);
+    // Step 4: Process sentiment analysis
+    let analyzeUser;
+    try {
+      analyzeUser = await getSentiment(userId, sessionId);
+    } catch (error) {
+      console.warn('Failed to analyze user sentiment:', error);
+      analyzeUser = 0; // Default neutral sentiment
+    }
 
-  const userMoodPercentage = moodTable[`${analyzeUser}`];
-  //const embeddings = await createEmbeddings(userDocument);
-  //await upsertChunksWithEmbeddings(userId, embeddings);
-  await registerSummary(userDocument, shortSummary, longSummary, emotions, normalizedScores, rawScores, mentalHealthScore, referralRecommendation, sessionId, userId, getData.chatlog);
-  await deleteAllTexts(userId, sessionId);
+    // Step 5: Generate AI responses with error handling
+    let shortSummary, dsmScore, userDocument, longSummary, englishTranscript;
+    
+    try {
+      // Execute OpenAI calls with proper error handling
+      const promises = [
+        callOpenAi(shortSummaryQuestion).catch(err => {
+          handleExternalServiceError(err, 'OpenAI', 'generate short summary');
+        }),
+        callOpenAi(dsmScoreQuestion).catch(err => {
+          handleExternalServiceError(err, 'OpenAI', 'generate DSM scores');
+        }),
+        callOpenAi(userDocumentQuestion).catch(err => {
+          handleExternalServiceError(err, 'OpenAI', 'generate user document');
+        }),
+        callOpenAi(longSummaryQuestion).catch(err => {
+          handleExternalServiceError(err, 'OpenAI', 'generate long summary');
+        })
+      ];
 
-  console.log({
-    chatlog: getData.chatlog,
-    shortSummary: shortSummary,
-    dsmScore: dsmScore,
-    longSummary: longSummary,
-    sessionId: sessionId,
-    mood: userMoodPercentage,
-    referral: referralRecommendation,
-  });
+      // Add translation call if needed
+      if (language === 'es-ES') {
+        promises.push(callOpenAi(spanishTranscipt).catch(err => {
+          handleExternalServiceError(err, 'OpenAI', 'translate to English');
+        }));
+      }
 
-  // Send response including referral recommendation
-  res.send({
-    chatlog: getData.chatlog,
-    shortSummary: shortSummary,
-    longSummary: longSummary,
-    sessionId: sessionId,
-    mood: userMoodPercentage,
-    emotions: emotions,
-    rawScores: rawScores,
-    normalizedScores: normalizedScores,
-    mentalHealthScore: mentalHealthScore,
-    referral: referralRecommendation, // Include referral recommendation in the response
-  });
-});
+      const results = await Promise.all(promises);
+      [shortSummary, dsmScore, userDocument, longSummary] = results;
+      
+      if (language === 'es-ES') {
+        englishTranscript = results[4];
+        querySpanish.text = englishTranscript;
+      }
+
+    } catch (error) {
+      // If any OpenAI call fails, we still want to provide some response
+      console.error('OpenAI processing failed:', error);
+      throw error;
+    }
+
+    // Step 6: Handle emotions analysis
+    let emotions;
+    try {
+      if (language === 'es-ES') {
+        emotions = await userEmotions(JSON.stringify(querySpanish));
+      } else {
+        emotions = await userEmotions(JSON.stringify({ text: cleanedText }));
+      }
+    } catch (error) {
+      console.warn('Failed to analyze user emotions:', error);
+      handleExternalServiceError(error, 'Emotion Analysis', 'analyze user emotions');
+    }
+
+    // Step 7: Process scores with error handling
+    let rawScores, normalizedScores, mentalHealthScore;
+    try {
+      rawScores = parseScores(dsmScore);
+      normalizedScores = normalizeScores(rawScores);
+      mentalHealthScore = calculateMentalHealthScore(normalizedScores).toFixed(2);
+    } catch (error) {
+      console.warn('Failed to process mental health scores:', error);
+      rawScores = {};
+      normalizedScores = {};
+      mentalHealthScore = '0.00';
+    }
+
+    // Step 8: Generate referral recommendation
+    let referralRecommendation = '';
+    try {
+      const referralPrompt = [
+        {
+          role: "system",
+          content: `You are a mental health referral bot. Analyze the following DSM scores and patient transcript to recommend a specialized therapy. Choose from the following areas:
+          
+          1. Depression/Anxiety
+          2. Trauma and PTSD
+          3. Family and Relationship Issues
+          4. Substance Abuse/Addiction
+          5. Grief and Loss
+
+          DSM Scores: ${JSON.stringify(rawScores)}
+
+          Transcript: ${userMessages}
+
+          At the end of your response, include the entire session transcript.
+
+          Respond in this format:
+          
+          Recommended Specialization: [Specialization]
+          Reason: [Explanation based on DSM scores and transcript]
+          Summary for Clinicians: [Concise summary of the patient's current situation]
+          Severity Assessment (1-5): [Number indicating current severity level, 5 = most critical]
+          Priority Ranking (1-5): [Number indicating how urgently care is needed, 5 = most urgent]
+
+          Full Session Transcript: [The entire session transcript here, exactly as provided below.]
+
+          =====
+
+          Full Session Transcript to Include:
+          ${fullSessionTranscript}
+          `
+        }
+      ];
+
+      referralRecommendation = await callOpenAi(referralPrompt);
+    } catch (error) {
+      console.warn('Failed to generate referral recommendation:', error);
+      referralRecommendation = 'Unable to generate referral recommendation at this time. Please review session manually.';
+    }
+
+    const userMoodPercentage = moodTable[`${analyzeUser}`] || 'Unknown';
+
+    // Step 9: Save summary with error handling
+    try {
+      await registerSummary(
+        userDocument, 
+        shortSummary, 
+        longSummary, 
+        emotions, 
+        normalizedScores, 
+        rawScores, 
+        mentalHealthScore, 
+        referralRecommendation, 
+        sessionId, 
+        userId, 
+        getData.chatlog
+      );
+    } catch (error) {
+      handleDatabaseError(error, 'save session summary');
+    }
+
+    // Step 10: Clean up session data
+    try {
+      await deleteAllTexts(userId, sessionId);
+    } catch (error) {
+      console.warn('Failed to delete session texts:', error);
+      // Don't fail the entire request if cleanup fails
+    }
+
+    console.log({
+      chatlog: getData.chatlog,
+      shortSummary: shortSummary,
+      dsmScore: dsmScore,
+      longSummary: longSummary,
+      sessionId: sessionId,
+      mood: userMoodPercentage,
+      referral: referralRecommendation,
+    });
+
+    // Step 11: Send successful response
+    res.json({
+      success: true,
+      data: {
+        chatlog: getData.chatlog,
+        shortSummary: shortSummary,
+        longSummary: longSummary,
+        sessionId: sessionId,
+        mood: userMoodPercentage,
+        emotions: emotions,
+        rawScores: rawScores,
+        normalizedScores: normalizedScores,
+        mentalHealthScore: mentalHealthScore,
+        referral: referralRecommendation,
+      }
+    });
+
+  } catch (error) {
+    console.error('Error in endSession:', error);
+    throw error; // This will be caught by asyncHandler and sent to global error handler
+  }
+}));
 
 module.exports = route;

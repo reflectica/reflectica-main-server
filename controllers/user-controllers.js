@@ -2,6 +2,7 @@ const Sentiment = require('sentiment');
 const AWS = require('aws-sdk');
 const axios = require('axios');
 const { summaryRef, sessionTextsRef } = require('../config/connection')
+const { handleDatabaseError, handleExternalServiceError } = require('../utils/errorHandler')
 const sentiment = new Sentiment();
 
 
@@ -29,6 +30,10 @@ const emailAllUserTranscripts = async (userId) => {
 
 const userEmotions = async (data) => {
   try {
+    if (!data) {
+      throw new Error('Data is required for emotion analysis');
+    }
+
     const response = await axios.post(
       'https://onq4bqqdrk.execute-api.us-east-2.amazonaws.com/bert', 
       data,
@@ -36,14 +41,15 @@ const userEmotions = async (data) => {
         headers: {
           'Content-Type': 'application/json',
         },
+        timeout: 30000, // 30 second timeout
       }
     );
 
     console.log(response.data);
     return response.data;
   } catch (error) {
-    console.error('Error:', error.response ? error.response.statusText : error.message);
-    throw new Error(`HTTP error! status: ${error.response ? error.response.status : 'unknown'}`);
+    console.error('Error in userEmotions:', error);
+    handleExternalServiceError(error, 'Emotion Analysis API', 'analyze user emotions');
   }
 };
 
@@ -66,29 +72,40 @@ const sendUserTranscriptsAfterDeletion = async (userId, userTranscript) => {
 }
 
 const getAllUserSessions = async (userId) => {
-  const today = new Date();
-  const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-  const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-  const result = await summaryRef.where("uid", '==', userId)
-    .where('time', '>=', firstDayOfMonth.toISOString())
-    .where('time', '<=', lastDayOfMonth.toISOString())
-    .orderBy("time", 'desc')
-    .get()
-    .then((querySnapshot) => {
-      if (querySnapshot.empty) {
-        console.log('No matching documents.');
-        return;
-      }
-      const resultArray = []
-      querySnapshot.forEach((doc) => {
-        resultArray.push(doc.data())
+  try {
+    if (!userId) {
+      throw new Error('userId is required');
+    }
+
+    const today = new Date();
+    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    
+    const result = await summaryRef.where("uid", '==', userId)
+      .where('time', '>=', firstDayOfMonth.toISOString())
+      .where('time', '<=', lastDayOfMonth.toISOString())
+      .orderBy("time", 'desc')
+      .get()
+      .then((querySnapshot) => {
+        if (querySnapshot.empty) {
+          console.log('No matching documents.');
+          return { summaryData: [], totalSessions: 0 };
+        }
+        const resultArray = []
+        querySnapshot.forEach((doc) => {
+          resultArray.push(doc.data())
+        });
+        return { summaryData: resultArray, totalSessions: resultArray.length}
+      })
+      .catch((error) => {
+        console.error('Error getting documents: ', error);
+        throw error;
       });
-      return { summaryData: resultArray, totalSessions: resultArray.length}
-    })
-    .catch((error) => {
-      console.error('Error getting documents: ', error);
-    });
-  return result
+    return result
+  } catch (error) {
+    console.error('Error in getAllUserSessions:', error);
+    handleDatabaseError(error, 'retrieve user sessions');
+  }
 }
 
 const deleteAllUserSummaries = async (uid) => {
