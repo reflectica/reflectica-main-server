@@ -1,46 +1,62 @@
 const { summaryRef, sessionTextsRef } = require('../config/connection')
 
 const getTextFromSummaryTable = async (sessionId, uid) => {
-  const result = summaryRef.where("sessionId", "==", sessionId)
-  .where("uid", "==", uid)
-  .get()
-  .then((querySnapshot) => {
-    if (querySnapshot.empty) {
-      console.log('No matching documents.');
-      return;
+  try {
+    if (!sessionId || !uid) {
+      throw new Error('Session ID and User ID are required');
     }
-    let returnData
-    querySnapshot.forEach((doc) => {
-      returnData = doc.data().chatLog
-    });
-    console.log(returnData)
-    return returnData
-  })
 
-  return result
+    const result = await summaryRef.where("sessionId", "==", sessionId)
+      .where("uid", "==", uid)
+      .get();
+      
+    if (result.empty) {
+      console.log('No matching documents found for session:', sessionId);
+      return null;
+    }
+    
+    let returnData;
+    result.forEach((doc) => {
+      returnData = doc.data().chatLog;
+    });
+    
+    console.log('Retrieved summary data for session:', sessionId);
+    return returnData;
+    
+  } catch (error) {
+    console.error('Error retrieving summary data:', error);
+    throw new Error(`Failed to retrieve session summary: ${error.message}`);
+  }
 }
   
 const getTexts = async (uid, sessionId) => {
-  const result = await sessionTextsRef.where("uid", '==', uid)
-    .where("sessionId", "==", sessionId)
-    .orderBy("time", 'asc')
-    .get()
-    .then((querySnapshot) => {
-      if (querySnapshot.empty) {
-        console.log('No matching documents.');
-        return;
-      }
-      let resultObject;
-      querySnapshot.forEach((doc) => {
-        console.log(doc.data())
-        resultObject = { chatlog: doc.data().chatlog, aiLog: doc.data().message }
-      });
-      return resultObject
-    })
-    .catch((error) => {
-      console.error('Error getting documents: ', error);
+  try {
+    if (!uid || !sessionId) {
+      throw new Error('User ID and Session ID are required');
+    }
+
+    const querySnapshot = await sessionTextsRef.where("uid", '==', uid)
+      .where("sessionId", "==", sessionId)
+      .orderBy("time", 'asc')
+      .get();
+      
+    if (querySnapshot.empty) {
+      console.log('No conversation data found for session:', sessionId);
+      return { chatlog: [], aiLog: null };
+    }
+    
+    let resultObject;
+    querySnapshot.forEach((doc) => {
+      console.log('Retrieved session document:', doc.id);
+      resultObject = { chatlog: doc.data().chatlog, aiLog: doc.data().message };
     });
-  return result
+    
+    return resultObject;
+    
+  } catch (error) {
+    console.error('Error retrieving conversation data:', error);
+    throw new Error(`Failed to retrieve conversation: ${error.message}`);
+  }
 }
 
 const getTextsSeperated = async (uid, sessionId) => {
@@ -80,17 +96,23 @@ const getTextsSeperated = async (uid, sessionId) => {
 };
 
 
-const deleteAllTexts = async (uid,sessionId) => {
-  await sessionTextsRef.where("uid", '==', uid)
-  .where("sessionId", "==", sessionId)
-  .get()
-  .then((querySnapshot) => {
+const deleteAllTexts = async (uid, sessionId) => {
+  try {
+    if (!uid || !sessionId) {
+      throw new Error('User ID and Session ID are required');
+    }
+
+    const querySnapshot = await sessionTextsRef.where("uid", '==', uid)
+      .where("sessionId", "==", sessionId)
+      .get();
+      
     if (querySnapshot.empty) {
-      console.log('No matching documents to delete.');
+      console.log('No documents found to delete for session:', sessionId);
       return;
     }
 
     // Create a batch for bulk deletion
+    const { db } = require('../config/connection');
     const batch = db.batch();
 
     querySnapshot.forEach((doc) => {
@@ -98,48 +120,61 @@ const deleteAllTexts = async (uid,sessionId) => {
     });
 
     // Commit the batch to perform the deletion
-    return batch.commit();
-  })
-  .then(() => {
-    console.log('Bulk delete operation completed successfully.');
-  })
-  .catch((error) => {
-    console.error('Error deleting documents: ', error);
-  });
+    await batch.commit();
+    console.log('Successfully deleted session data for:', sessionId);
+    
+  } catch (error) {
+    console.error('Error deleting session data:', error);
+    throw new Error(`Failed to delete session data: ${error.message}`);
+  }
 }
 
 const addTextData = async (uid, role, transcript, sessionId) => {
-  const timeStamp = new Date().toISOString();
+  try {
+    if (!uid || !role || !transcript || !sessionId) {
+      throw new Error('All parameters (uid, role, transcript, sessionId) are required');
+    }
 
-  // Data to be added or updated in the document
-  const dataToUpdate = {
-    uid: uid,
-    time: timeStamp, // Consider if you need to update time for every message
-    sessionId: sessionId,
-    chatlog: [{ role: role, content: transcript }] // Array of chat logs
-  };
+    if (!['user', 'assistant'].includes(role)) {
+      throw new Error('Role must be either "user" or "assistant"');
+    }
 
-  await sessionTextsRef.where("sessionId", "==", sessionId).where("uid", "==", uid)
-    .get()
-    .then(async (querySnapshot) => {
-      if (querySnapshot.empty) {
-        // If no existing session, add a new document
-        await sessionTextsRef.add(dataToUpdate);
-        console.log("New session document created");
-      } else {
-        // If session exists, update the chatlog array
-        querySnapshot.forEach(async (doc) => {
-          await doc.ref.update({
-            // Optionally update 'time' here if you want the latest message timestamp
-            chatlog: [...doc.data().chatlog, { role: role, content: transcript }]
-          });
-          console.log("Document updated successfully");
+    const timeStamp = new Date().toISOString();
+
+    // Data to be added or updated in the document
+    const dataToUpdate = {
+      uid: uid,
+      time: timeStamp,
+      sessionId: sessionId,
+      chatlog: [{ role: role, content: transcript }]
+    };
+
+    const querySnapshot = await sessionTextsRef.where("sessionId", "==", sessionId)
+      .where("uid", "==", uid)
+      .get();
+      
+    if (querySnapshot.empty) {
+      // If no existing session, add a new document
+      await sessionTextsRef.add(dataToUpdate);
+      console.log("New session document created for:", sessionId);
+    } else {
+      // If session exists, update the chatlog array
+      const updatePromises = [];
+      querySnapshot.forEach((doc) => {
+        const updatePromise = doc.ref.update({
+          chatlog: [...doc.data().chatlog, { role: role, content: transcript }]
         });
-      }
-    })
-    .catch((error) => {
-      console.error('Error adding or updating document: ', error);
-    });
+        updatePromises.push(updatePromise);
+      });
+      
+      await Promise.all(updatePromises);
+      console.log("Session document updated successfully for:", sessionId);
+    }
+    
+  } catch (error) {
+    console.error('Error adding text data:', error);
+    throw new Error(`Failed to save message: ${error.message}`);
+  }
 };
 
 module.exports = {

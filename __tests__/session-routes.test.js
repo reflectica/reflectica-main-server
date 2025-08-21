@@ -1,8 +1,8 @@
 const request = require('supertest');
 const express = require('express');
 const route = require('../routes/session-routes');
-const { getAllUserSessions, parseScores, calculateMentalHealthScore, normalizeScores } = require('../controllers/user-controllers');
-const { getTexts, getTextFromSummaryTable } = require('../controllers/text-controllers');
+const { getAllUserSessions, parseScores, calculateMentalHealthScore, normalizeScores, userEmotions, getSentiment } = require('../controllers/user-controllers');
+const { getTexts, getTextFromSummaryTable, deleteAllTexts } = require('../controllers/text-controllers');
 const { callOpenAi } = require('../config/openAi');
 const { englishToSpanish } = require('../utils/text');
 const { upsertChunksWithEmbeddings } = require('../config/pinecone');
@@ -12,7 +12,16 @@ jest.mock('../controllers/user-controllers');
 jest.mock('../controllers/text-controllers');
 jest.mock('../config/openAi');
 jest.mock('../utils/text', () => ({
-  englishToSpanish: jest.fn()
+  englishToSpanish: jest.fn(),
+  askForShortSummary: 'short summary prompt',
+  askForin5LongSummary: 'long summary prompt',
+  askForin3LongSummary: 'short long summary prompt', 
+  askForUserProfile: 'user profile prompt',
+  askForDSMScores: 'dsm scores prompt',
+  askForDSMScoresSpanish: 'dsm scores spanish prompt'
+}));
+jest.mock('../utils/mood', () => ({
+  moodTable: { '0': 50 }
 }));
 jest.mock('../config/pinecone');
 jest.mock('../controllers/summary-controller');
@@ -76,6 +85,9 @@ describe('Session Routes', () => {
     parseScores.mockReturnValue([1, 2, 3]);
     normalizeScores.mockReturnValue([0.1, 0.2, 0.3]);
     calculateMentalHealthScore.mockReturnValue(0.6);
+    userEmotions.mockResolvedValue(mockEnglishTranscript);
+    getSentiment.mockResolvedValue(0);
+    deleteAllTexts.mockResolvedValue();
     upsertChunksWithEmbeddings.mockResolvedValue();
     registerSummary.mockResolvedValue();
 
@@ -94,9 +106,12 @@ describe('Session Routes', () => {
       shortSummary: mockEnglishTranscript,
       longSummary: mockEnglishTranscript,
       sessionId: '1',
+      mood: 50,
+      emotions: mockEnglishTranscript, // userEmotions mock returns the input
+      rawScores: [1, 2, 3],
       normalizedScores: [0.1, 0.2, 0.3],
       mentalHealthScore: '0.60',
-      referral: ''
+      referral: mockEnglishTranscript // callOpenAi mock returns the input
     });
   });
 

@@ -66,29 +66,38 @@ const sendUserTranscriptsAfterDeletion = async (userId, userTranscript) => {
 }
 
 const getAllUserSessions = async (userId) => {
-  const today = new Date();
-  const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-  const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-  const result = await summaryRef.where("uid", '==', userId)
-    .where('time', '>=', firstDayOfMonth.toISOString())
-    .where('time', '<=', lastDayOfMonth.toISOString())
-    .orderBy("time", 'desc')
-    .get()
-    .then((querySnapshot) => {
-      if (querySnapshot.empty) {
-        console.log('No matching documents.');
-        return;
-      }
-      const resultArray = []
-      querySnapshot.forEach((doc) => {
-        resultArray.push(doc.data())
-      });
-      return { summaryData: resultArray, totalSessions: resultArray.length}
-    })
-    .catch((error) => {
-      console.error('Error getting documents: ', error);
+  try {
+    if (!userId) {
+      throw new Error('User ID is required');
+    }
+
+    const today = new Date();
+    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    
+    const querySnapshot = await summaryRef.where("uid", '==', userId)
+      .where('time', '>=', firstDayOfMonth.toISOString())
+      .where('time', '<=', lastDayOfMonth.toISOString())
+      .orderBy("time", 'desc')
+      .get();
+      
+    if (querySnapshot.empty) {
+      console.log('No sessions found for user:', userId);
+      return { summaryData: [], totalSessions: 0 };
+    }
+    
+    const resultArray = [];
+    querySnapshot.forEach((doc) => {
+      resultArray.push(doc.data());
     });
-  return result
+    
+    console.log(`Retrieved ${resultArray.length} sessions for user:`, userId);
+    return { summaryData: resultArray, totalSessions: resultArray.length };
+    
+  } catch (error) {
+    console.error('Error retrieving user sessions:', error);
+    throw new Error(`Failed to retrieve user sessions: ${error.message}`);
+  }
 }
 
 const deleteAllUserSummaries = async (uid) => {
@@ -138,21 +147,37 @@ const deleteAllUserSummaries = async (uid) => {
   });
 }
 const updateFieldInUserCollection = async (userId, value, fieldName) => {
-  const userDocument = userRef.doc(userId)
+  try {
+    if (!userId || !fieldName) {
+      throw new Error('User ID and field name are required');
+    }
 
-  await userDocument.update({
-    [fieldName]: value
-  })
-  .then(() => console.log("updated the doc"))
-  .catch((e) => console.log(e))
+    const userDocument = userRef.doc(userId);
+    await userDocument.update({
+      [fieldName]: value
+    });
+    
+    console.log(`Successfully updated ${fieldName} for user:`, userId);
+    
+  } catch (error) {
+    console.error('Error updating user field:', error);
+    throw new Error(`Failed to update user data: ${error.message}`);
+  }
 }
 
 const checkForExistingData = async (email) => {
-  const q = await subscribedEmails.where("email", "==", email).get()
-    .then((querySnapshot) => {
-      return querySnapshot.empty
-    })
-  return q;
+  try {
+    if (!email) {
+      throw new Error('Email is required');
+    }
+
+    const querySnapshot = await subscribedEmails.where("email", "==", email).get();
+    return querySnapshot.empty;
+    
+  } catch (error) {
+    console.error('Error checking existing email:', error);
+    throw new Error(`Failed to check email existence: ${error.message}`);
+  }
 };
 
 const getSentiment = async (uid, sessionId) => {
