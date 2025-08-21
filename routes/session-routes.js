@@ -7,6 +7,7 @@ const { upsertChunksWithEmbeddings } = require('../config/pinecone')
 const { createEmbeddings } = require('../config/openAi')
 const { askForShortSummary, askForin5LongSummary, askForin3LongSummary, askForUserProfile, askForDSMScores, askForDSMScoresSpanish, englishToSpanish } = require('../utils/text')
 const { moodTable } = require('../utils/mood')
+const logger = require('../utils/logger')
 
 route.post("/getAllSessions", async (req, res) => {
   const { userId } = req.body;
@@ -38,7 +39,7 @@ route.post("/endSession", async (req, res) => {
   const englishTranscript = await callOpenAi(spanishTranscipt);
   const queryData = { "inputs": userMessages };
   const queryEmotions = { "text": userMessages };
-  console.log("queryemotions", queryEmotions)
+  logger.debug('Processing session emotions', { userId, sessionId, language })
   const querySpanish = {"text": englishTranscript}
 
   const shortSummaryQuestion = getData.chatlog.concat(askForShortSummary);

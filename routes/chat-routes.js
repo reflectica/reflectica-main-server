@@ -4,11 +4,13 @@ const route = require('express').Router();
 const { callAI, openai } = require('../config/openAi');
 const { addTextData, getTexts, getTextsSeperated } = require('../controllers/text-controllers');
 const { searchDocs } = require('../config/pinecone');
+const logger = require('../utils/logger');
 
 route.post("/", async (req, res) => {
   const { prompt, userId, sessionId, therapyMode, sessionType } = req.body; // Extract therapyMode
 
   if (!therapyMode) {
+    logger.warn('Missing therapyMode parameter', { userId, sessionId });
     return res.status(400).json({ error: 'Missing therapyMode parameter.' });
   }
 
@@ -31,18 +33,17 @@ route.post("/", async (req, res) => {
 
     // Append the current prompt to the conversation history
     const combinedPrompt = conversationHistory + `User: ${prompt}\nAI:`;
-    console.log("Combined Prompt:", combinedPrompt);
+    logger.debug('Chat conversation prepared', { userId, sessionId, therapyMode, sessionType });
 
     let textResponse;
-    console.log(getData);
+    logger.debug('Retrieved conversation data', { userId, sessionId, messageCount: getData?.length });
     try {
       // Pass combinedPrompt and therapyMode to callAI
-      console.log("therapy type:", sessionType )
-      console.log("therapy mode:", therapyMode)
+      logger.info('Processing AI request', { userId, sessionId, therapyMode, sessionType });
       const aiResponse = await callAI(combinedPrompt, therapyMode, sessionType);
       const textResponse = aiResponse.text;
       const audioFilePath = aiResponse.audioFile;    
-      console.log("AI Response:", textResponse);
+      logger.info('AI response generated', { userId, sessionId, hasAudio: !!audioFilePath });
 
       // Log AI's response
       await addTextData(userId, "assistant", textResponse, sessionId);
@@ -50,14 +51,12 @@ route.post("/", async (req, res) => {
       res.send({ audio: audioFilePath });
 
     } catch (e) {
-      console.log(e);
+      logger.error('AI processing failed', { error: e.message, userId, sessionId, stack: e.stack });
       res.status(500).send(e);
     }
 
-    console.log(getData);
-
   } catch (e) {
-    console.log(e);
+    logger.error('Chat route error', { error: e.message, userId, sessionId, stack: e.stack });
     res.status(500).send(e);
   }
 });

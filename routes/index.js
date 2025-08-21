@@ -5,6 +5,7 @@ const userRoutes = require('./user-routes')
 const mailRoutes = require('./mail-routes')
 const chatRoutes = require('./chat-routes')
 const audioRoutes = require('./audio-routes')
+const healthRoutes = require('./health-routes')
 
 
 route.use('/dashboardData', dashRoutes)
@@ -13,5 +14,6 @@ route.use('/user', userRoutes)
 route.use('/mail', mailRoutes)
 route.use('/chat', chatRoutes)
 route.use('/audio', audioRoutes)
+route.use('/health', healthRoutes)
 
 module.exports = route;
