@@ -34,10 +34,7 @@ describe('POST /chat', () => {
     addTextData.mockResolvedValue();
     getTexts.mockResolvedValue([]);
     getTextsSeperated.mockResolvedValue({ userLogs: [], aiLogs: [] });
-    callAI.mockResolvedValue('AI response');
-    openai.audio.speech.create.mockResolvedValue({
-      arrayBuffer: async () => Buffer.from('audio data')
-    });
+    callAI.mockResolvedValue({ text: 'AI response', audioFile: Buffer.from('audio data').toString('base64') });
 
     const res = await request(app)
       .post('/chat')
@@ -67,5 +64,62 @@ describe('POST /chat', () => {
       });
 
     expect(res.status).toBe(500);
+    expect(res.body.error).toBe('Unable to save message');
+    expect(res.body.message).toBe('There was an issue saving your message. Please try again.');
+  });
+
+  it('should return 400 if missing required parameters', async () => {
+    const res = await request(app)
+      .post('/chat')
+      .send({
+        therapyMode: 'mode1',
+        sessionType: 'type1'
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Missing required parameters');
+    expect(res.body.message).toBe('Please provide prompt, user ID, and session ID to continue the conversation.');
+  });
+
+  it('should return 429 for rate limit errors', async () => {
+    addTextData.mockResolvedValue();
+    getTexts.mockResolvedValue([]);
+    getTextsSeperated.mockResolvedValue({ userLogs: [], aiLogs: [] });
+    callAI.mockRejectedValue(new Error('rate limit exceeded'));
+
+    const res = await request(app)
+      .post('/chat')
+      .send({
+        prompt: 'Hello',
+        userId: 'user1',
+        sessionId: 'session1',
+        therapyMode: 'mode1',
+        sessionType: 'type1'
+      });
+
+    expect(res.status).toBe(429);
+    expect(res.body.error).toBe('Service temporarily unavailable');
+    expect(res.body.message).toBe('Our AI service is currently experiencing high demand. Please try again in a few moments.');
+  });
+
+  it('should return 503 for network errors', async () => {
+    addTextData.mockResolvedValue();
+    getTexts.mockResolvedValue([]);
+    getTextsSeperated.mockResolvedValue({ userLogs: [], aiLogs: [] });
+    callAI.mockRejectedValue(new Error('network timeout'));
+
+    const res = await request(app)
+      .post('/chat')
+      .send({
+        prompt: 'Hello',
+        userId: 'user1',
+        sessionId: 'session1',
+        therapyMode: 'mode1',
+        sessionType: 'type1'
+      });
+
+    expect(res.status).toBe(503);
+    expect(res.body.error).toBe('Network error');
+    expect(res.body.message).toBe('There was a network issue connecting to our AI service. Please check your connection and try again.');
   });
 });
