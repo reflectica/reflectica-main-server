@@ -1,29 +1,33 @@
 // Create a mock Firebase connection for testing
+const createMockChain = () => ({
+  where: jest.fn(() => createMockChain()),
+  orderBy: jest.fn(() => createMockChain()),
+  limit: jest.fn(() => createMockChain()),
+  get: jest.fn(() => Promise.resolve({
+    empty: true,
+    forEach: jest.fn()
+  }))
+});
+
 module.exports = {
   summaryRef: {
-    where: jest.fn(() => ({
-      get: jest.fn(() => Promise.resolve({
-        empty: true,
-        forEach: jest.fn()
-      }))
-    })),
+    ...createMockChain(),
     add: jest.fn(() => Promise.resolve())
   },
   sessionTextsRef: {
-    where: jest.fn(() => ({
-      where: jest.fn(() => ({
-        orderBy: jest.fn(() => ({
-          get: jest.fn(() => Promise.resolve({
-            empty: true,
-            forEach: jest.fn()
-          }))
-        })),
-        get: jest.fn(() => Promise.resolve({
-          empty: true,
-          forEach: jest.fn()
-        }))
+    ...createMockChain(),
+    add: jest.fn(() => Promise.resolve()),
+    firestore: {
+      batch: jest.fn(() => ({
+        delete: jest.fn(),
+        commit: jest.fn(() => Promise.resolve())
       }))
-    })),
-    add: jest.fn(() => Promise.resolve())
+    }
+  },
+  db: {
+    batch: jest.fn(() => ({
+      delete: jest.fn(),
+      commit: jest.fn(() => Promise.resolve())
+    }))
   }
 };

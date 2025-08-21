@@ -4,6 +4,11 @@ const route = require('express').Router();
 const { callAI, openai } = require('../config/openAi');
 const { addTextData, getTexts, getTextsSeperated } = require('../controllers/text-controllers');
 const { searchDocs } = require('../config/pinecone');
+const { sessionTextsRef } = require('../config/connection');
+const { 
+  isValidSessionId, 
+  validateSessionAccess 
+} = require('../utils/sessionUtils');
 const { 
   asyncHandler, 
   validateRequiredFields, 
@@ -23,6 +28,26 @@ route.post("/", asyncHandler(async (req, res) => {
       message: 'Prompt must be a non-empty string',
       code: 'INVALID_PROMPT'
     }));
+  }
+
+  // Validate session ID format
+  if (!isValidSessionId(sessionId)) {
+    return res.status(400).json(createErrorResponse({
+      message: 'Invalid session ID format',
+      code: 'INVALID_SESSION_ID'
+    }));
+  }
+
+  // For existing sessions, validate user access
+  const existingSessionStats = await require('../utils/sessionUtils').getSessionStats(sessionId, sessionTextsRef);
+  if (existingSessionStats.exists) {
+    const hasAccess = await validateSessionAccess(userId, sessionId, sessionTextsRef);
+    if (!hasAccess) {
+      return res.status(403).json(createErrorResponse({
+        message: 'User does not have access to this session',
+        code: 'SESSION_ACCESS_DENIED'
+      }));
+    }
   }
 
   try {

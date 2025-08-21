@@ -1,4 +1,4 @@
-const { summaryRef, sessionTextsRef } = require('../config/connection')
+const { summaryRef, sessionTextsRef, db } = require('../config/connection')
 const { handleDatabaseError } = require('../utils/errorHandler')
 
 const getTextFromSummaryTable = async (sessionId, uid) => {
