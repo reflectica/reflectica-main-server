@@ -164,11 +164,10 @@ const handleDatabaseError = (error, operation = 'database operation') => {
  * Handles external service errors with retry logic
  */
 const handleExternalServiceError = (error, serviceName, operation = 'operation') => {
-  console.error(`${serviceName} error during ${operation}:`, error);
+  console.error(`${serviceName} error during ${operation} - service unavailable`);
   
   if (error.response) {
     const status = error.response.status;
-    const message = error.response.data?.error?.message || error.message;
     
     if (status === 401 || status === 403) {
       throw new ExternalServiceError(serviceName, 'Authentication failed');
@@ -182,14 +181,14 @@ const handleExternalServiceError = (error, serviceName, operation = 'operation')
       throw new ExternalServiceError(serviceName, 'Service temporarily unavailable');
     }
     
-    throw new ExternalServiceError(serviceName, message);
+    throw new ExternalServiceError(serviceName, 'Service error occurred');
   }
   
   if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
     throw new NetworkError(`Unable to connect to ${serviceName}`);
   }
   
-  throw new ExternalServiceError(serviceName, error.message || 'Unknown service error');
+  throw new ExternalServiceError(serviceName, 'Unknown service error');
 };
 
 /**
