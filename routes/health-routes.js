@@ -2,6 +2,7 @@ const route = require('express').Router();
 const logger = require('../utils/logger');
 const fs = require('fs');
 const path = require('path');
+const { db } = require('../config/connection');
 
 route.get('/', async (req, res) => {
   try {
@@ -54,35 +55,46 @@ route.get('/detailed', async (req, res) => {
 
 route.get('/errors', async (req, res) => {
   try {
-    const logsDir = path.join(__dirname, '../logs');
-    const today = new Date().toISOString().split('T')[0];
-    const errorLogPath = path.join(logsDir, `error-${today}.log`);
+    const now = new Date();
+    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+    const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+    // Query recent errors from Firestore (no orderBy to avoid index requirement)
+    const recentErrorsQuery = await db.collection('logs')
+      .where('level', '==', 'error')
+      .limit(50)
+      .get();
+
+    const errors = [];
+    recentErrorsQuery.forEach(doc => {
+      errors.push(doc.data());
+    });
+
+    // Sort errors by timestamp (newest first) and filter by time ranges
+    const sortedErrors = errors.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
     
-    let errors = [];
-    if (fs.existsSync(errorLogPath)) {
-      const errorLogContent = fs.readFileSync(errorLogPath, 'utf8');
-      errors = errorLogContent
-        .split('\n')
-        .filter(line => line.trim())
-        .map(line => {
-          try {
-            return JSON.parse(line);
-          } catch {
-            return { message: line, timestamp: new Date().toISOString() };
-          }
-        })
-        .slice(-50); // Last 50 errors
-    }
+    const dayFilteredErrors = sortedErrors.filter(e => {
+      const errorTime = new Date(e.timestamp);
+      return errorTime >= oneDayAgo;
+    });
+
+    const lastHourErrors = dayFilteredErrors.filter(e => {
+      const errorTime = new Date(e.timestamp);
+      return errorTime >= oneHourAgo;
+    }).length;
 
     const errorSummary = {
-      totalErrors: errors.length,
-      lastHour: errors.filter(e => {
-        const errorTime = new Date(e.timestamp);
-        const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-        return errorTime > oneHourAgo;
-      }).length,
-      recentErrors: errors.slice(-10),
-      timestamp: new Date().toISOString()
+      totalErrors: dayFilteredErrors.length,
+      lastHour: lastHourErrors,
+      recentErrors: dayFilteredErrors.slice(0, 10).map(error => ({
+        timestamp: error.timestamp,
+        message: error.message,
+        userId: error.userId,
+        sessionId: error.sessionId,
+        url: error.url,
+        method: error.method
+      })),
+      timestamp: now.toISOString()
     };
 
     logger.debug('Error monitoring dashboard accessed', { ip: req.ip });

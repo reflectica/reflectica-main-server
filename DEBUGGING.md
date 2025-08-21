@@ -17,12 +17,18 @@ GET /health/detailed
 ```
 Returns comprehensive system information including CPU usage, platform details, and Node.js version.
 
-## Log Files Location
-Log files are stored in the `logs/` directory:
-- `error-YYYY-MM-DD.log` - Error messages and stack traces
-- `warn-YYYY-MM-DD.log` - Warning messages  
-- `info-YYYY-MM-DD.log` - General application events
-- `debug-YYYY-MM-DD.log` - Detailed debugging information
+## Log Storage
+Logs are stored in two locations:
+1. **Firestore Database** (primary) - Long-term retention with automatic cleanup:
+   - Error logs: 90 days retention
+   - Warning logs: 60 days retention  
+   - Info/Debug logs: 30 days retention
+
+2. **Local Files** (backup) - stored in `logs/` directory:
+   - `error-YYYY-MM-DD.log` - Error messages and stack traces
+   - `warn-YYYY-MM-DD.log` - Warning messages  
+   - `info-YYYY-MM-DD.log` - General application events
+   - `debug-YYYY-MM-DD.log` - Detailed debugging information
 
 ## Common Issues & Troubleshooting
 
@@ -79,6 +85,12 @@ All logs include:
 ## Environment Variables
 - `LOG_LEVEL` - Controls logging verbosity (error, warn, info, debug)
 - `NODE_ENV` - Environment mode (development, production)
+
+## Firestore Setup
+To enable automatic log cleanup, configure TTL (Time To Live) in Firebase Console:
+1. Go to Firestore Database > Indexes
+2. Create single-field index on `logs` collection, field `expiresAt`, with TTL enabled
+3. Or run: `node scripts/setup-firestore-ttl.js` for instructions
 
 ## Contact Support
 If issues persist after checking logs and health status, contact technical support with:

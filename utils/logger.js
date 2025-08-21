@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { db } = require('../config/connection');
 
 class Logger {
     constructor() {
@@ -9,6 +10,17 @@ class Logger {
         if (!fs.existsSync(this.logDir)) {
             fs.mkdirSync(this.logDir, { recursive: true });
         }
+
+        // Firestore collections for logs
+        this.logsRef = db.collection('logs');
+        
+        // Retention periods in days
+        this.retentionPeriods = {
+            error: 90,
+            warn: 60,
+            info: 30,
+            debug: 30
+        };
     }
 
     _shouldLog(level) {
@@ -34,14 +46,34 @@ class Logger {
         fs.appendFileSync(filePath, formattedMessage + '\n');
     }
 
-    _log(level, message, meta = {}) {
+    async _log(level, message, meta = {}) {
         if (!this._shouldLog(level)) return;
 
         const sanitizedMeta = this._sanitizeMeta(meta);
-        const formattedMessage = this._formatMessage(level, message, sanitizedMeta);
+        const timestamp = new Date().toISOString();
         
+        // Log entry for Firestore
+        const logEntry = {
+            timestamp,
+            level,
+            message,
+            ...sanitizedMeta,
+            // TTL field for automatic deletion
+            expiresAt: new Date(Date.now() + (this.retentionPeriods[level] * 24 * 60 * 60 * 1000))
+        };
+
+        const formattedMessage = JSON.stringify(logEntry);
+        
+        // Console output (immediate)
         console.log(formattedMessage);
+        
+        // File output (immediate, for local debugging)
         this._writeToFile(level, formattedMessage);
+        
+        // Firestore output (async, don't block on failures)
+        this._writeToFirestore(logEntry).catch(err => {
+            console.error('Failed to write log to Firestore:', err.message);
+        });
     }
 
     _sanitizeMeta(meta) {
@@ -54,7 +86,10 @@ class Logger {
         
         const sanitizeObject = (obj) => {
             for (const key in obj) {
-                if (sensitiveFields.some(field => key.toLowerCase().includes(field))) {
+                // Remove undefined values for Firestore compatibility
+                if (obj[key] === undefined) {
+                    delete obj[key];
+                } else if (sensitiveFields.some(field => key.toLowerCase().includes(field))) {
                     obj[key] = '[REDACTED]';
                 } else if (typeof obj[key] === 'object' && obj[key] !== null) {
                     sanitizeObject(obj[key]);
@@ -64,6 +99,15 @@ class Logger {
         
         sanitizeObject(sanitized);
         return sanitized;
+    }
+
+    async _writeToFirestore(logEntry) {
+        try {
+            await this.logsRef.add(logEntry);
+        } catch (error) {
+            // Don't throw - logging failures shouldn't break the app
+            console.error('Firestore logging failed:', error.message);
+        }
     }
 
     error(message, meta = {}) {
