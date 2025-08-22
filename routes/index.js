@@ -7,6 +7,7 @@ const chatRoutes = require('./chat-routes')
 const audioRoutes = require('./audio-routes')
 const { createErrorResponse } = require('../utils/errorHandler')
 const healthRoutes = require('./health-routes')
+const connectivityRoutes = require('./connectivity-routes')
 
 route.use('/dashboardData', dashRoutes)
 route.use('/session', sessionRoutes)
@@ -15,6 +16,7 @@ route.use('/mail', mailRoutes)
 route.use('/chat', chatRoutes)
 route.use('/audio', audioRoutes)
 route.use('/health', healthRoutes)
+route.use('/connectivity', connectivityRoutes)
 
 // Handle 404 errors for unknown routes
 route.use('*', (req, res) => {
