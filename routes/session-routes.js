@@ -318,15 +318,10 @@ route.post("/endSession", asyncHandler(async (req, res) => {
 
     // Step 6: Handle emotions analysis
     let emotions;
-    try {
-      if (language === 'es-ES') {
-        emotions = await userEmotions(JSON.stringify(querySpanish));
-      } else {
-        emotions = await userEmotions(JSON.stringify({ text: cleanedText }));
-      }
-    } catch (error) {
-      console.warn('Failed to analyze user emotions:', error);
-      handleExternalServiceError(error, 'Emotion Analysis', 'analyze user emotions');
+    if (language === 'es-ES') {
+      emotions = await userEmotions(JSON.stringify(querySpanish));
+    } else {
+      emotions = await userEmotions(JSON.stringify({ text: cleanedText }));
     }
 
     // Step 7: Process scores with error handling
