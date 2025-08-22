@@ -45,8 +45,39 @@ const userEmotions = async (data) => {
     console.log("Emotion analysis completed successfully");
     return response.data;
   } catch (error) {
-    console.error('Error in userEmotions:', error);
-    handleExternalServiceError(error, 'Emotion Analysis API', 'analyze user emotions');
+    console.error('Emotion analysis service failed, using default neutral response:', error.message);
+    
+    // Return default neutral emotion response in correct format
+    return [
+      { "label": "neutral", "score": 1.0 },
+      { "label": "sadness", "score": 0.0 },
+      { "label": "joy", "score": 0.0 },
+      { "label": "anger", "score": 0.0 },
+      { "label": "fear", "score": 0.0 },
+      { "label": "surprise", "score": 0.0 },
+      { "label": "disgust", "score": 0.0 },
+      { "label": "disappointment", "score": 0.0 },
+      { "label": "grief", "score": 0.0 },
+      { "label": "remorse", "score": 0.0 },
+      { "label": "annoyance", "score": 0.0 },
+      { "label": "disapproval", "score": 0.0 },
+      { "label": "caring", "score": 0.0 },
+      { "label": "realization", "score": 0.0 },
+      { "label": "nervousness", "score": 0.0 },
+      { "label": "optimism", "score": 0.0 },
+      { "label": "approval", "score": 0.0 },
+      { "label": "desire", "score": 0.0 },
+      { "label": "love", "score": 0.0 },
+      { "label": "admiration", "score": 0.0 },
+      { "label": "curiosity", "score": 0.0 },
+      { "label": "amusement", "score": 0.0 },
+      { "label": "confusion", "score": 0.0 },
+      { "label": "excitement", "score": 0.0 },
+      { "label": "relief", "score": 0.0 },
+      { "label": "gratitude", "score": 0.0 },
+      { "label": "embarrassment", "score": 0.0 },
+      { "label": "pride", "score": 0.0 }
+    ];
   }
 };
 
