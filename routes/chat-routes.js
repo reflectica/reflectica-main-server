@@ -20,6 +20,7 @@ const {
   validateTherapyMode,
   validateSessionType
 } = require('../utils/errorHandler');
+const logger = require('../utils/logger');
 
 route.post("/", asyncHandler(async (req, res) => {
   validateRequiredFields(['prompt', 'userId', 'sessionId', 'therapyMode', 'sessionType'], req.body);
@@ -32,8 +33,11 @@ route.post("/", asyncHandler(async (req, res) => {
   therapyMode = validateTherapyMode(therapyMode);
   sessionType = validateSessionType(sessionType);
 
+  logger.info('Chat request initiated', { userId, sessionId, therapyMode, sessionType });
+
   // Validate session ID format
   if (!isValidSessionId(sessionId)) {
+    logger.warn('Invalid session ID format', { userId, sessionId });
     return res.status(400).json(createErrorResponse({
       message: 'Invalid session ID format',
       code: 'INVALID_SESSION_ID'
@@ -45,6 +49,7 @@ route.post("/", asyncHandler(async (req, res) => {
   if (existingSessionStats.exists) {
     const hasAccess = await validateSessionAccess(userId, sessionId, sessionTextsRef);
     if (!hasAccess) {
+      logger.warn('Session access denied', { userId, sessionId });
       return res.status(403).json(createErrorResponse({
         message: 'User does not have access to this session',
         code: 'SESSION_ACCESS_DENIED'
@@ -87,30 +92,30 @@ route.post("/", asyncHandler(async (req, res) => {
 
     // Append the current prompt to the conversation history
     const combinedPrompt = conversationHistory + `User: ${prompt}\nAI:`;
-    console.log("Chat request processed for user session");
-    console.log("therapy type:", sessionType);
-    console.log("therapy mode:", therapyMode);
+    logger.debug('Chat conversation prepared', { userId, sessionId, therapyMode, sessionType, messageCount: getData?.length });
 
     // Step 4: Get AI response with comprehensive error handling
     let aiResponse;
     try {
+      logger.info('Processing AI request', { userId, sessionId, therapyMode, sessionType });
       aiResponse = await callAI(combinedPrompt, therapyMode, sessionType);
       
       if (!aiResponse || !aiResponse.text) {
         throw new Error('Invalid AI response received');
       }
       
-      console.log("AI response generated successfully");
+      logger.info('AI response generated', { userId, sessionId, hasAudio: !!aiResponse.audioFile });
     } catch (error) {
-      console.error('AI processing error:', error);
+      logger.error('AI processing error', { error: error.message, userId, sessionId, stack: error.stack });
       handleExternalServiceError(error, 'OpenAI', 'generate chat response');
     }
 
     // Step 5: Log AI's response with error handling
     try {
       await addTextData(userId, "assistant", aiResponse.text, sessionId);
+      logger.debug('AI response saved to database', { userId, sessionId });
     } catch (error) {
-      console.warn('Failed to save AI response:', error);
+      logger.warn('Failed to save AI response', { error: error.message, userId, sessionId });
       // Don't fail the entire request if we can't save the AI response
     }
 
@@ -120,13 +125,14 @@ route.post("/", asyncHandler(async (req, res) => {
       try {
         // Validate audio file exists and is accessible
         audioResponse = aiResponse.audioFile;
+        logger.debug('Audio response prepared', { userId, sessionId, audioFile: audioResponse });
       } catch (error) {
-        console.warn('Audio processing error:', error);
+        logger.warn('Audio processing error', { error: error.message, userId, sessionId });
         // Continue without audio if there's an issue
       }
     }
 
-    console.log("Chat session completed successfully");
+    logger.info('Chat session completed successfully', { userId, sessionId });
 
     // Step 7: Send successful response
     res.json({
@@ -139,7 +145,7 @@ route.post("/", asyncHandler(async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Chat processing error:', error);
+    logger.error('Chat processing error', { error: error.message, userId, sessionId, stack: error.stack });
     throw error; // Will be caught by asyncHandler and sent to global error handler
   }
 }));

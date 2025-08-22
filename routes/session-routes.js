@@ -22,14 +22,20 @@ const {
   createErrorResponse,
   validateUserId
 } = require('../utils/errorHandler')
+const logger = require('../utils/logger')
 
 route.post("/createSession", asyncHandler(async (req, res) => {
   validateRequiredFields(['userId'], req.body);
   
   const userId = validateUserId(req.body.userId);
   
+  logger.info('Creating new session', { userId });
+  
   try {
     const sessionId = generateSessionId();
+    logger.debug('Session ID generated', { userId, sessionId });
+    
+    logger.info('Session created successfully', { userId, sessionId });
     
     res.json({ 
       success: true,
@@ -37,6 +43,7 @@ route.post("/createSession", asyncHandler(async (req, res) => {
       message: 'Session created successfully'
     });
   } catch (error) {
+    logger.error('Session creation failed', { error: error.message, userId, stack: error.stack });
     handleDatabaseError(error, 'create session');
   }
 }))
@@ -179,8 +186,11 @@ route.post("/endSession", asyncHandler(async (req, res) => {
   const userId = validateUserId(req.body.userId);
   const { sessionId, language, sessionType } = req.body;
   
+  logger.info('Ending session', { userId, sessionId, language, sessionType });
+  
   // Validate session ID format
   if (!isValidSessionId(sessionId)) {
+    logger.warn('Invalid session ID format during end session', { userId, sessionId });
     return res.status(400).json(createErrorResponse({
       message: 'Invalid session ID format',
       code: 'INVALID_SESSION_ID'
@@ -190,6 +200,7 @@ route.post("/endSession", asyncHandler(async (req, res) => {
   // Validate user access to session
   const hasAccess = await validateSessionAccess(userId, sessionId, sessionTextsRef);
   if (!hasAccess) {
+    logger.warn('Session access denied during end session', { userId, sessionId });
     return res.status(403).json(createErrorResponse({
       message: 'User does not have access to this session',
       code: 'SESSION_ACCESS_DENIED'
@@ -230,6 +241,8 @@ route.post("/endSession", asyncHandler(async (req, res) => {
 
     let cleanedText = userMessages.replace(/\n/g, ' ');
     const spanishTranscipt = getData.chatlog.concat(englishToSpanish);
+    
+    logger.debug('Processing session emotions', { userId, sessionId, language, messageCount: getData.chatlog.length });
     
     // Step 3: Prepare OpenAI queries
     const queryData = { "inputs": userMessages };
@@ -402,7 +415,7 @@ route.post("/endSession", asyncHandler(async (req, res) => {
       // Don't fail the entire request if cleanup fails
     }
 
-    console.log("Session ended successfully", {
+    logger.info('Session ended successfully', {
       sessionId: sessionId,
       userId: userId,
       messageCount: getData.chatlog ? getData.chatlog.length : 0,

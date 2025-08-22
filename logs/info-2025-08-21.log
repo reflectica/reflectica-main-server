@@ -1,0 +1,17 @@
+{"timestamp":"2025-08-21T20:32:54.292Z","level":"info","message":"Server started on port 3006"}
+{"timestamp":"2025-08-21T20:33:08.443Z","level":"info","message":"Request received","method":"GET","url":"/health","userAgent":"curl/8.7.1","ip":"::1"}
+{"timestamp":"2025-08-21T20:33:08.445Z","level":"info","message":"Request completed","method":"GET","url":"/","statusCode":200,"duration":"3ms"}
+{"timestamp":"2025-08-21T22:58:05.205Z","level":"info","message":"Server started on port 3006","expiresAt":"2025-09-20T22:58:05.206Z"}
+{"timestamp":"2025-08-21T22:58:13.084Z","level":"info","message":"Request received","method":"GET","url":"/health/errors","userAgent":"curl/8.7.1","ip":"::1","expiresAt":"2025-09-20T22:58:13.084Z"}
+{"timestamp":"2025-08-21T22:58:13.228Z","level":"info","message":"Request completed","method":"GET","url":"/errors","statusCode":500,"duration":"144ms","expiresAt":"2025-09-20T22:58:13.228Z"}
+{"timestamp":"2025-08-21T22:59:15.151Z","level":"info","message":"Server started on port 3006","expiresAt":"2025-09-20T22:59:15.151Z"}
+{"timestamp":"2025-08-21T22:59:22.182Z","level":"info","message":"Request received","method":"GET","url":"/health/errors","userAgent":"curl/8.7.1","ip":"::1","expiresAt":"2025-09-20T22:59:22.182Z"}
+{"timestamp":"2025-08-21T22:59:22.419Z","level":"info","message":"Request completed","method":"GET","url":"/errors","statusCode":500,"duration":"237ms","expiresAt":"2025-09-20T22:59:22.419Z"}
+{"timestamp":"2025-08-21T22:59:47.385Z","level":"info","message":"Server started on port 3006","expiresAt":"2025-09-20T22:59:47.386Z"}
+{"timestamp":"2025-08-21T22:59:58.881Z","level":"info","message":"Request received","method":"GET","url":"/health/errors","userAgent":"curl/8.7.1","ip":"::1","expiresAt":"2025-09-20T22:59:58.881Z"}
+{"timestamp":"2025-08-21T22:59:59.117Z","level":"info","message":"Request completed","method":"GET","url":"/errors","statusCode":200,"duration":"236ms","expiresAt":"2025-09-20T22:59:59.117Z"}
+{"timestamp":"2025-08-21T23:00:03.410Z","level":"info","message":"Request received","method":"GET","url":"/health","userAgent":"curl/8.7.1","ip":"::1","expiresAt":"2025-09-20T23:00:03.410Z"}
+{"timestamp":"2025-08-21T23:00:03.411Z","level":"info","message":"Request completed","method":"GET","url":"/","statusCode":200,"duration":"1ms","expiresAt":"2025-09-20T23:00:03.411Z"}
+{"timestamp":"2025-08-21T23:55:44.397Z","level":"info","message":"Server started on port 3006","expiresAt":"2025-09-20T23:55:44.397Z"}
+{"timestamp":"2025-08-21T23:56:00.782Z","level":"info","message":"Request received","method":"GET","url":"/health/errors","userAgent":"curl/8.7.1","ip":"::1","expiresAt":"2025-09-20T23:56:00.782Z"}
+{"timestamp":"2025-08-21T23:56:00.950Z","level":"info","message":"Request completed","method":"GET","url":"/errors","statusCode":200,"duration":"168ms","expiresAt":"2025-09-20T23:56:00.951Z"}
