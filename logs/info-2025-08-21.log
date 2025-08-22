@@ -12,3 +12,6 @@
 {"timestamp":"2025-08-21T22:59:59.117Z","level":"info","message":"Request completed","method":"GET","url":"/errors","statusCode":200,"duration":"236ms","expiresAt":"2025-09-20T22:59:59.117Z"}
 {"timestamp":"2025-08-21T23:00:03.410Z","level":"info","message":"Request received","method":"GET","url":"/health","userAgent":"curl/8.7.1","ip":"::1","expiresAt":"2025-09-20T23:00:03.410Z"}
 {"timestamp":"2025-08-21T23:00:03.411Z","level":"info","message":"Request completed","method":"GET","url":"/","statusCode":200,"duration":"1ms","expiresAt":"2025-09-20T23:00:03.411Z"}
+{"timestamp":"2025-08-21T23:55:44.397Z","level":"info","message":"Server started on port 3006","expiresAt":"2025-09-20T23:55:44.397Z"}
+{"timestamp":"2025-08-21T23:56:00.782Z","level":"info","message":"Request received","method":"GET","url":"/health/errors","userAgent":"curl/8.7.1","ip":"::1","expiresAt":"2025-09-20T23:56:00.782Z"}
+{"timestamp":"2025-08-21T23:56:00.950Z","level":"info","message":"Request completed","method":"GET","url":"/errors","statusCode":200,"duration":"168ms","expiresAt":"2025-09-20T23:56:00.951Z"}

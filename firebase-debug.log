@@ -1,0 +1,85 @@
+[debug] [2025-08-22T07:10:37.197Z] ----------------------------------------------------------------------
+[debug] [2025-08-22T07:10:37.198Z] Command:       /Users/mj/n/bin/node /Users/mj/n/bin/firebase functions:shell --project=reflectica1
+[debug] [2025-08-22T07:10:37.198Z] CLI Version:   14.14.0
+[debug] [2025-08-22T07:10:37.198Z] Platform:      darwin
+[debug] [2025-08-22T07:10:37.198Z] Node Version:  v22.18.0
+[debug] [2025-08-22T07:10:37.199Z] Time:          Fri Aug 22 2025 03:10:37 GMT-0400 (Eastern Daylight Time)
+[debug] [2025-08-22T07:10:37.199Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2025-08-22T07:10:37.278Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-08-22T07:10:37.479Z] Running auto auth
+[debug] [2025-08-22T07:10:37.480Z] [iam] checking project reflectica1 for permissions ["firebase.projects.get"]
+[debug] [2025-08-22T07:10:37.480Z] No OAuth tokens found
+[debug] [2025-08-22T07:10:37.482Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/reflectica1:testIamPermissions [none]
+[debug] [2025-08-22T07:10:37.482Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/reflectica1:testIamPermissions x-goog-quota-user=projects/reflectica1
+[debug] [2025-08-22T07:10:37.482Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/reflectica1:testIamPermissions {"permissions":["firebase.projects.get"]}
+[debug] [2025-08-22T07:10:37.740Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/reflectica1:testIamPermissions 200
+[debug] [2025-08-22T07:10:37.740Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/reflectica1:testIamPermissions {"permissions":["firebase.projects.get"]}
+[warn] ⚠  functions: Functions Emulator unable to start on port 5000, starting on 5001 instead. {"metadata":{"emulator":{"name":"functions"},"message":"Functions Emulator unable to start on port 5000, starting on 5001 instead."}}
+[debug] [2025-08-22T07:10:37.908Z] [functions] Functions Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
+[warn] ⚠  functions: Application Default Credentials detected. Non-emulated services will access production using these credentials. Be careful! {"metadata":{"emulator":{"name":"functions"},"message":"Application Default Credentials detected. Non-emulated services will access production using these credentials. Be careful!"}}
+[debug] [2025-08-22T07:10:37.909Z] No OAuth tokens found
+[debug] [2025-08-22T07:10:37.909Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/reflectica1/adminSdkConfig [none]
+[debug] [2025-08-22T07:10:38.512Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/reflectica1/adminSdkConfig 200
+[debug] [2025-08-22T07:10:38.512Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/reflectica1/adminSdkConfig {"projectId":"reflectica1","storageBucket":"reflectica1.appspot.com","locationId":"us-central"}
+[debug] [2025-08-22T07:10:38.525Z] [functions] Watching "/Users/mj/Sites/reflectica/reflectica-main-server/functions" for Cloud Functions...
+[debug] [2025-08-22T07:10:38.529Z] Validating nodejs source
+[debug] [2025-08-22T07:10:39.075Z] > [functions] package.json contents: {
+  "name": "functions",
+  "description": "Cloud Functions for Firebase",
+  "scripts": {
+    "lint": "eslint .",
+    "serve": "firebase emulators:start --only functions",
+    "shell": "firebase functions:shell",
+    "start": "npm run shell",
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log"
+  },
+  "engines": {
+    "node": "18"
+  },
+  "main": "index.js",
+  "dependencies": {
+    "firebase-admin": "^13.4.0",
+    "firebase-functions": "^6.4.0"
+  },
+  "devDependencies": {
+    "eslint": "^8.15.0",
+    "eslint-config-google": "^0.14.0"
+  },
+  "private": true
+}
+[debug] [2025-08-22T07:10:39.076Z] Building nodejs source
+[debug] [2025-08-22T07:10:39.076Z] Failed to find version of module node: reached end of search path /Users/mj/Sites/reflectica/reflectica-main-server/functions/node_modules
+[warn] ⚠  functions: Your requested "node" version "18" doesn't match your global version "22". Using node@22 from host. 
+[debug] [2025-08-22T07:10:39.077Z] Could not find functions.yaml. Must use http discovery
+[debug] [2025-08-22T07:10:39.084Z] Found firebase-functions binary at '/Users/mj/Sites/reflectica/reflectica-main-server/functions/node_modules/.bin/firebase-functions'
+[info] Serving at port 8650
+
+[debug] [2025-08-22T07:10:39.279Z] Got response from /__/functions.yaml {"endpoints":{"cleanupLogs":{"availableMemoryMb":256,"timeoutSeconds":540,"minInstances":null,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","region":["us-central1"],"labels":{},"scheduleTrigger":{"schedule":"every sunday 02:00","retryConfig":{},"timeZone":"America/New_York"},"entryPoint":"cleanupLogs"},"cleanupLogsManual":{"availableMemoryMb":256,"timeoutSeconds":540,"minInstances":null,"maxInstances":null,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","labels":{},"scheduleTrigger":{"schedule":"every 24 hours","retryConfig":{},"timeZone":"America/New_York"},"entryPoint":"cleanupLogsManual"}},"specVersion":"v1alpha1","requiredAPIs":[{"api":"cloudscheduler.googleapis.com","reason":"Needed for scheduled functions."}],"extensions":{}}
+[debug] [2025-08-22T07:10:43.297Z] [functions] Loaded functions definitions from source: cleanupLogs, cleanupLogsManual.
+[debug] [2025-08-22T07:10:43.298Z] [functions[us-central1-cleanupLogs]] function ignored because the pubsub emulator does not exist or is not running.
+[debug] [2025-08-22T07:10:43.298Z] [functions[us-central1-cleanupLogsManual]] function ignored because the pubsub emulator does not exist or is not running.
+[info] i  functions: Loaded functions: cleanupLogs, cleanupLogsManual 
+[warn] ⚠  functions: The following emulators are not running, calls to these services will affect production: firestore, database, pubsub, storage, eventarc, tasks 
+[debug] [2025-08-22T07:10:54.301Z] shell:cleanupLogsManual: trigger={"entryPoint":"cleanupLogsManual","platform":"gcfv2","region":"us-central1","name":"cleanupLogsManual","id":"us-central1-cleanupLogsManual","codebase":"default","availableMemoryMb":256,"labels":{"EVENTARC_CLOUD_EVENT_SOURCE":"run-emulated.googleapis.com/projects/reflectica1/locations/us-central1/services/cleanupLogsManual"},"timeoutSeconds":540,"secretEnvironmentVariables":[],"eventTrigger":{"eventType":"pubsub","resource":""},"schedule":{"schedule":"every 24 hours","timeZone":"America/New_York","retryConfig":{}}}
+[debug] [2025-08-22T07:10:54.301Z] shell:cleanupLogsManual: opts={}, data={}
+[debug] [2025-08-22T07:10:54.304Z] DEBUG: [worker-pool] addWorker(us-central1-cleanupLogsManual)
+[debug] [2025-08-22T07:10:54.305Z] DEBUG: [worker-pool] Adding worker with key us-central1-cleanupLogsManual, total=1
+[debug] [2025-08-22T07:10:54.736Z] DEBUG: [runtime-status] [33949] Resolved module firebase-admin {"declared":true,"installed":true,"version":"13.4.0","resolution":"/Users/mj/Sites/reflectica/reflectica-main-server/functions/node_modules/firebase-admin/lib/index.js"}
+[debug] [2025-08-22T07:10:54.737Z] DEBUG: [runtime-status] [33949] Resolved module firebase-functions {"declared":true,"installed":true,"version":"6.4.0","resolution":"/Users/mj/Sites/reflectica/reflectica-main-server/functions/node_modules/firebase-functions/lib/v2/index.js"}
+[debug] [2025-08-22T07:10:54.737Z] DEBUG: [runtime-status] [33949] Outgoing network have been stubbed. [{"name":"http","status":"mocked"},{"name":"http","status":"mocked"},{"name":"https","status":"mocked"},{"name":"https","status":"mocked"},{"name":"net","status":"mocked"}]
+[debug] [2025-08-22T07:10:54.737Z] DEBUG: [runtime-status] [33949] Resolved module firebase-functions {"declared":true,"installed":true,"version":"6.4.0","resolution":"/Users/mj/Sites/reflectica/reflectica-main-server/functions/node_modules/firebase-functions/lib/v2/index.js"}
+[debug] [2025-08-22T07:10:54.896Z] DEBUG: [runtime-status] [33949] Checked functions.config() {"config":{}}
+[debug] [2025-08-22T07:10:54.896Z] DEBUG: [runtime-status] [33949] firebase-functions has been stubbed. {"functionsResolution":{"declared":true,"installed":true,"version":"6.4.0","resolution":"/Users/mj/Sites/reflectica/reflectica-main-server/functions/node_modules/firebase-functions/lib/v2/index.js"}}
+[debug] [2025-08-22T07:10:54.896Z] DEBUG: [runtime-status] [33949] Resolved module firebase-functions {"declared":true,"installed":true,"version":"6.4.0","resolution":"/Users/mj/Sites/reflectica/reflectica-main-server/functions/node_modules/firebase-functions/lib/v2/index.js"}
+[debug] [2025-08-22T07:10:54.897Z] DEBUG: [runtime-status] [33949] Resolved module firebase-admin {"declared":true,"installed":true,"version":"13.4.0","resolution":"/Users/mj/Sites/reflectica/reflectica-main-server/functions/node_modules/firebase-admin/lib/index.js"}
+[debug] [2025-08-22T07:10:54.898Z] DEBUG: [runtime-status] [33949] Resolved module firebase-functions {"declared":true,"installed":true,"version":"6.4.0","resolution":"/Users/mj/Sites/reflectica/reflectica-main-server/functions/node_modules/firebase-functions/lib/v2/index.js"}
+[debug] [2025-08-22T07:10:54.898Z] DEBUG: [runtime-status] [33949] firebase-admin has been stubbed. {"adminResolution":{"declared":true,"installed":true,"version":"13.4.0","resolution":"/Users/mj/Sites/reflectica/reflectica-main-server/functions/node_modules/firebase-admin/lib/index.js"}}
+[debug] [2025-08-22T07:10:54.901Z] DEBUG: [runtime-status] [33949] Functions runtime initialized. {"cwd":"/Users/mj/Sites/reflectica/reflectica-main-server/functions","node_version":"22.18.0"}
+[debug] [2025-08-22T07:10:54.901Z] DEBUG: [runtime-status] [33949] Listening to port: /var/folders/j_/hw1bt3vs0mgdq0q3cwc309t00000gn/T/fire_emu_f2f0adbef8292815.sock
+[debug] [2025-08-22T07:10:54.915Z] DEBUG: [worker-us-central1-cleanupLogsManual-2f79a4de-b53d-47fd-892c-614fc118f7aa]: IDLE
+[info] >  🔧 Manual log cleanup triggered {"user":"🔧 Manual log cleanup triggered","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-cleanupLogsManual"},"extension":{},"message":"\u001b[90m> \u001b[39m 🔧 Manual log cleanup triggered"}}
+[info] >  🧹 Starting manual log cleanup at 2025-08-22T07:10:54.920Z {"user":"🧹 Starting manual log cleanup at 2025-08-22T07:10:54.920Z","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-cleanupLogsManual"},"extension":{},"message":"\u001b[90m> \u001b[39m 🧹 Starting manual log cleanup at 2025-08-22T07:10:54.920Z"}}
+[info] >  No more expired logs found {"user":"No more expired logs found","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-cleanupLogsManual"},"extension":{},"message":"\u001b[90m> \u001b[39m No more expired logs found"}}
+[info] >  ✅ Manual cleanup completed successfully. Total deleted: 0 logs {"user":"✅ Manual cleanup completed successfully. Total deleted: 0 logs","metadata":{"emulator":{"name":"functions"},"function":{"name":"us-central1-cleanupLogsManual"},"extension":{},"message":"\u001b[90m> \u001b[39m ✅ Manual cleanup completed successfully. Total deleted: 0 logs"}}
