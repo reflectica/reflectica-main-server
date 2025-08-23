@@ -21,6 +21,8 @@ const {
   validateSessionType
 } = require('../utils/errorHandler');
 const logger = require('../utils/logger');
+const { withOpenAIRetry, withExternalAPIRetry, circuitBreakers } = require('../utils/networkReliability');
+const { draftOperations } = require('../utils/sessionCache');
 
 route.post("/", asyncHandler(async (req, res) => {
   validateRequiredFields(['prompt', 'userId', 'sessionId', 'therapyMode', 'sessionType'], req.body);
@@ -58,65 +60,145 @@ route.post("/", asyncHandler(async (req, res) => {
   }
 
   try {
-    // Step 1: Log user message with error handling
+    // Step 1: Save user message draft and log to database
     try {
+      // First, save draft for network resilience
+      draftOperations.saveChatDraft(userId, sessionId, [{ role: 'user', content: prompt.trim() }]);
+      
+      // Then attempt to save to database
       await addTextData(userId, "user", prompt.trim(), sessionId);
+      logger.debug('User message saved successfully', { userId, sessionId });
     } catch (error) {
+      logger.error('Failed to save user message', { error: error.message, userId, sessionId });
+      
+      // Check if we have a draft to recover from
+      const existingDraft = draftOperations.getChatDraft(userId, sessionId);
+      if (existingDraft) {
+        logger.info('User message preserved in draft cache', { userId, sessionId });
+      }
+      
       handleDatabaseError(error, 'save user message');
     }
 
-    // Step 2: Retrieve conversation history with error handling
+    // Step 2: Retrieve conversation history with retry logic
     let getData, userLogs, aiLogs;
     try {
+      // Use existing enhanced controllers with retry logic
       getData = await getTexts(userId, sessionId);
       const separatedLogs = await getTextsSeperated(userId, sessionId);
       userLogs = separatedLogs.userLogs;
       aiLogs = separatedLogs.aiLogs;
-    } catch (error) {
-      handleDatabaseError(error, 'retrieve conversation history');
-    }
-
-    // Step 3: Build conversation history string
-    let conversationHistory = '';
-    try {
-      userLogs.forEach((log, index) => {
-        conversationHistory += `User: ${log.content}\n`;
-        if (aiLogs[index]) {
-          conversationHistory += `AI: ${aiLogs[index].content}\n`;
-        }
+      
+      logger.debug('Conversation history retrieved', { 
+        userId, 
+        sessionId, 
+        userMessageCount: userLogs?.length, 
+        aiMessageCount: aiLogs?.length 
       });
     } catch (error) {
-      console.warn('Error building conversation history:', error);
+      logger.error('Failed to retrieve conversation history', { error: error.message, userId, sessionId });
+      
+      // Try to use draft data as fallback
+      const chatDraft = draftOperations.getChatDraft(userId, sessionId);
+      if (chatDraft && chatDraft.chatlog) {
+        logger.info('Using draft conversation history as fallback', { userId, sessionId });
+        userLogs = chatDraft.chatlog.filter(msg => msg.role === 'user');
+        aiLogs = chatDraft.chatlog.filter(msg => msg.role === 'assistant');
+        getData = { chatlog: chatDraft.chatlog };
+      } else {
+        // Ultimate fallback
+        userLogs = [{ role: 'user', content: prompt.trim() }];
+        aiLogs = [];
+        getData = { chatlog: [] };
+      }
+    }
+
+    // Step 3: Build conversation history string with error resilience
+    let conversationHistory = '';
+    try {
+      if (userLogs && aiLogs) {
+        userLogs.forEach((log, index) => {
+          conversationHistory += `User: ${log.content}\n`;
+          if (aiLogs[index]) {
+            conversationHistory += `AI: ${aiLogs[index].content}\n`;
+          }
+        });
+      }
+    } catch (error) {
+      logger.warn('Error building conversation history', { error: error.message, userId, sessionId });
       conversationHistory = `User: ${prompt}\n`; // Fallback to current prompt only
     }
 
     // Append the current prompt to the conversation history
     const combinedPrompt = conversationHistory + `User: ${prompt}\nAI:`;
-    logger.debug('Chat conversation prepared', { userId, sessionId, therapyMode, sessionType, messageCount: getData?.length });
+    logger.debug('Chat conversation prepared', { userId, sessionId, therapyMode, sessionType, messageCount: getData?.chatlog?.length });
 
-    // Step 4: Get AI response with comprehensive error handling
+    // Step 4: Get AI response with circuit breaker and retry logic
     let aiResponse;
     try {
       logger.info('Processing AI request', { userId, sessionId, therapyMode, sessionType });
-      aiResponse = await callAI(combinedPrompt, therapyMode, sessionType);
       
-      if (!aiResponse || !aiResponse.text) {
-        throw new Error('Invalid AI response received');
-      }
+      // Use circuit breaker pattern for OpenAI calls
+      aiResponse = await circuitBreakers.openai.call(async () => {
+        return await withOpenAIRetry(async () => {
+          const response = await callAI(combinedPrompt, therapyMode, sessionType);
+          
+          if (!response || !response.text) {
+            throw new Error('Invalid AI response received');
+          }
+          
+          return response;
+        }, { userId, sessionId, therapyMode, sessionType });
+      }, { userId, sessionId, operation: 'chat_ai_call' });
       
       logger.info('AI response generated', { userId, sessionId, hasAudio: !!aiResponse.audioFile });
+      
+      // Update draft with AI response
+      const currentChatlog = getData?.chatlog || [];
+      const updatedChatlog = [
+        ...currentChatlog,
+        { role: 'user', content: prompt.trim() },
+        { role: 'assistant', content: aiResponse.text }
+      ];
+      draftOperations.saveChatDraft(userId, sessionId, updatedChatlog, aiResponse);
+      
     } catch (error) {
       logger.error('AI processing error', { error: error.message, userId, sessionId, stack: error.stack });
+      
+      // Check circuit breaker state
+      if (error.code === 'CIRCUIT_BREAKER_OPEN') {
+        return res.status(503).json(createErrorResponse({
+          message: 'AI service temporarily unavailable. Please try again in a moment.',
+          code: 'SERVICE_UNAVAILABLE',
+          retryAfter: 30
+        }));
+      }
+      
       handleExternalServiceError(error, 'OpenAI', 'generate chat response');
     }
 
-    // Step 5: Log AI's response with error handling
+    // Step 5: Save AI response to database with error handling
     try {
       await addTextData(userId, "assistant", aiResponse.text, sessionId);
       logger.debug('AI response saved to database', { userId, sessionId });
+      
+      // Clear draft since we successfully saved to database
+      // Keep draft for a bit longer in case of subsequent failures
+      setTimeout(() => {
+        // Only remove draft if no recent failures
+        const circuitBreakerState = circuitBreakers.openai.getState();
+        if (circuitBreakerState.state === 'CLOSED') {
+          // Keep the draft for potential recovery, but mark it as saved
+          draftOperations.updateDraft(userId, sessionId, { savedToDatabase: true });
+        }
+      }, 60000); // Wait 1 minute before cleanup
+      
     } catch (error) {
-      logger.warn('Failed to save AI response', { error: error.message, userId, sessionId });
+      logger.warn('Failed to save AI response to database', { error: error.message, userId, sessionId });
+      
       // Don't fail the entire request if we can't save the AI response
+      // The draft will preserve the conversation state
+      logger.info('AI response preserved in draft cache', { userId, sessionId });
     }
 
     // Step 6: Handle audio response
@@ -147,6 +229,58 @@ route.post("/", asyncHandler(async (req, res) => {
   } catch (error) {
     logger.error('Chat processing error', { error: error.message, userId, sessionId, stack: error.stack });
     throw error; // Will be caught by asyncHandler and sent to global error handler
+  }
+}));
+
+/**
+ * GET /chat/draft/:sessionId - Retrieve draft session data for recovery
+ */
+route.get("/draft/:sessionId", asyncHandler(async (req, res) => {
+  const { sessionId } = req.params;
+  const { userId } = req.query;
+
+  if (!userId) {
+    return res.status(400).json(createErrorResponse({
+      message: 'userId is required as query parameter',
+      code: 'MISSING_USER_ID'
+    }));
+  }
+
+  if (!isValidSessionId(sessionId)) {
+    return res.status(400).json(createErrorResponse({
+      message: 'Invalid session ID format',
+      code: 'INVALID_SESSION_ID'
+    }));
+  }
+
+  try {
+    const draft = draftOperations.getChatDraft(userId, sessionId);
+    
+    if (!draft) {
+      return res.status(404).json(createErrorResponse({
+        message: 'No draft found for this session',
+        code: 'DRAFT_NOT_FOUND'
+      }));
+    }
+
+    logger.info('Draft session data retrieved', { userId, sessionId, draftAge: Date.now() - new Date(draft.timestamp).getTime() });
+
+    res.json({
+      success: true,
+      draft: {
+        sessionId,
+        chatlog: draft.chatlog || [],
+        aiResponse: draft.aiResponse || null,
+        timestamp: draft.timestamp,
+        savedToDatabase: draft.savedToDatabase || false
+      }
+    });
+  } catch (error) {
+    logger.error('Error retrieving draft session', { error: error.message, userId, sessionId });
+    res.status(500).json(createErrorResponse({
+      message: 'Failed to retrieve draft session data',
+      code: 'DRAFT_RETRIEVAL_ERROR'
+    }));
   }
 }));
 
