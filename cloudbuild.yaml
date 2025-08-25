@@ -6,14 +6,14 @@ steps:
     args: 
       - 'build'
       - '-t'
-      - 'gcr.io/$PROJECT_ID/reflectica-backend:$COMMIT_SHA'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/reflectica-backend/reflectica-backend:$COMMIT_SHA'
       - '-t'
-      - 'gcr.io/$PROJECT_ID/reflectica-backend:latest'
+      - 'us-central1-docker.pkg.dev/$PROJECT_ID/reflectica-backend/reflectica-backend:latest'
       - '.'
 
-  # Step 2: Push the image to Google Container Registry
+  # Step 2: Push the image to Artifact Registry
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', '--all-tags', 'gcr.io/$PROJECT_ID/reflectica-backend']
+    args: ['push', '--all-tags', 'us-central1-docker.pkg.dev/$PROJECT_ID/reflectica-backend/reflectica-backend']
 
   # Step 3: Deploy to Cloud Run with all configurations
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
@@ -22,7 +22,7 @@ steps:
       - 'run'
       - 'deploy'
       - 'reflectica-backend'
-      - '--image=gcr.io/$PROJECT_ID/reflectica-backend:$COMMIT_SHA'
+      - '--image=us-central1-docker.pkg.dev/$PROJECT_ID/reflectica-backend/reflectica-backend:$COMMIT_SHA'
       - '--region=us-central1'
       - '--platform=managed'
       - '--allow-unauthenticated'
