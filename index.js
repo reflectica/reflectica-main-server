@@ -15,8 +15,10 @@ const PORT = process.env.NODE_ENV === 'production'
 const ALLOWED_ORIGINS = process.env.NODE_ENV === 'production' 
   ? [
       'https://reflectica.ai',     // Production domain
-      'capacitor://localhost',     // iOS production app
-      'http://localhost'           // Android production app
+      'capacitor://localhost',     // iOS simulator
+      'http://localhost',          // Android production app
+      'file://',                   // Physical iOS devices
+      null                         // Allow requests with no origin (mobile apps)
     ]
   : [
       'http://localhost:3000',     // Web dev
