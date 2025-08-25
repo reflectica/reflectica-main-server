@@ -6,7 +6,10 @@ const { globalErrorHandler } = require('./utils/errorHandler')
 const logger = require('./utils/logger')
 
 const app = express()
-const PORT = process.env.PORT || 3006;
+const PORT = process.env.NODE_ENV === 'production' 
+  ? process.env.PORT || 3006 
+  : process.env.PORT || 3007;
+
 
 // Enhanced CORS configuration for different environments
 const ALLOWED_ORIGINS = process.env.NODE_ENV === 'production' 
@@ -69,7 +72,7 @@ app.get('/', (req, res) => {
 
 // Global error handling middleware (must be last)
 app.use(globalErrorHandler);
-  
+
 app.listen(PORT, () => {
-    logger.info(`Server started on port ${PORT}`)
-})
+  console.log(`Server running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
+});
