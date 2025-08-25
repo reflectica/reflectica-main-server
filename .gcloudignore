@@ -1,0 +1,39 @@
+# Git files
+.git
+.gitignore
+
+# Dependencies
+node_modules/
+
+# Environment and config files
+.env
+.env.*
+
+# Documentation
+*.md
+README.md
+DEPLOYMENT.md
+
+# Test files
+__tests__/
+test-*.js
+*.test.js
+
+# Log files
+logs/
+*.log
+firebase-debug.log
+
+# Temporary files
+*.tmp
+*.temp
+.DS_Store
+
+# Development files
+nodemon.json
+.vscode/
+.idea/
+
+# Build artifacts
+dist/
+build/
